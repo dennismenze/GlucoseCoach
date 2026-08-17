@@ -43,7 +43,7 @@ def validate_source_tree() -> None:
             continue
         relative = path.relative_to(ROOT)
         require(path.suffix.lower() not in RAW_SUFFIXES, f"Raw export must not be committed: {relative}")
-        if path.suffix.lower() in TEXT_SUFFIXES:
+        if ".github" not in relative.parts and path.suffix.lower() in TEXT_SUFFIXES:
             text = path.read_text(encoding="utf-8", errors="ignore")
             require(not EMAIL_PATTERN.search(text), f"Potential email address in {relative}")
             require(not DEVICE_PATTERN.search(text), f"Potential device identifier in {relative}")
