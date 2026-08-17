@@ -38,7 +38,7 @@ Diese Aussagen sind Beobachtungen, keine kausalen Nachweise und keine Grundlage 
 - lokales Tagebuch für Lebensmittel, Makronährstoffe, Sport, Schritte, Schlaf, Krankheit und Stress
 - JSON-Import/-Export des lokalen Tagebuchs
 - Datenqualitäts- und Sentinel-Dokumentation
-- vollständiger de-identifizierter Detaildatensatz als komprimiertes JSON; lokale Browserprüfung auf Knopfdruck
+- reproduzierbare Python-Pipeline zur Erzeugung eines de-identifizierten Detaildatensatzes und einer prüfbaren Release-Datei
 
 ## Lokal starten
 

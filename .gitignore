@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Raw private exports — never commit
+*.eml
+*.zip
+*.csv
+data/raw/
+raw/
+export_*/
+
+# Local/generated clutter
+.DS_Store
+Thumbs.db
+*.log
+coverage/
+
+# Generated plaintext/binary intermediates; exact values are committed as Base64 text parts
+data/cgm-*.json
+data/summary.json
+data/clinical-events.json
+data/full-export.deidentified.json.gz
