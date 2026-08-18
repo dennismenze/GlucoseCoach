@@ -74,7 +74,9 @@
     const lines = String(source).replace(/^\uFEFF/, '').split(/\r?\n/);
     const headerLine = lines.findIndex((line) => /zeitstempel|timestamp/i.test(line));
     if (headerLine < 0) throw new Error('Keine unterstützte Kopfzeile gefunden.');
-    const delimiter = [',', ';', '\t'].sort((a, b) => countDelimiter(lines[headerLine], b) - countDelimiter(lines[headerLine], a))[0];
+    const delimiter = [',', ';', '\t'].sort(
+      (a, b) => countDelimiter(lines[headerLine], b) - countDelimiter(lines[headerLine], a),
+    )[0];
     const relevant = lines.slice(headerLine).join('\n');
     const parsed = [];
     let row = [];
@@ -110,6 +112,13 @@
 
   function extraKind(filename, headers) {
     const file = String(filename || '').toLowerCase();
+
+    // These six are handled by the base importer. Never let a broad context
+    // heuristic (for example the substring "wert") intercept them.
+    if (/^(?:cgm_data_|bolus_data_|insulin_data_|basal_data_|bg_data_|alarms_data_)/.test(file)) {
+      return null;
+    }
+
     if (/^cgm_carbs_data_/.test(file)) return 'cgmCarbs';
     if (/^exercise_data_/.test(file)) return 'exercise';
     if (/^food_data_/.test(file)) return 'food';
@@ -117,13 +126,16 @@
     if (/^medication_data_/.test(file)) return 'medication';
     if (/^notes_data_/.test(file)) return 'note';
 
+    const normalized = headers.map(norm);
     const has = (...values) => indexOf(headers, values) >= 0;
+    const hasExact = (...values) => normalized.some((header) => values.includes(header));
+
     if (has('intensität', 'intensity') && has('verbrannte kalorien', 'calories burned')) return 'exercise';
     if (has('medikamententyp', 'medication type')) return 'medication';
     if (has('portionen', 'servings') || has('anzahl der portionen', 'number of servings')) return 'food';
-    if (has('insulin-typ', 'insulin type') && has('wert', 'value') && has('name')) return 'manualInsulin';
-    if (headers.length === 2 && has('wert', 'value')) return 'note';
-    if (headers.length === 2 && has('kh (g)', 'carbs (g)', 'kohlenhydrate')) return 'cgmCarbs';
+    if (has('insulin-typ', 'insulin type') && hasExact('wert', 'value') && has('name')) return 'manualInsulin';
+    if (headers.length === 2 && hasExact('kh (g)', 'carbs (g)', 'kohlenhydrate')) return 'cgmCarbs';
+    if (headers.length === 2 && hasExact('wert', 'value')) return 'note';
     return null;
   }
 
@@ -186,8 +198,14 @@
         const calories = idx.calories >= 0 ? number(row[idx.calories]) : null;
         const portions = idx.portions >= 0 ? clean(row[idx.portions]).slice(0, 80) : '';
         const portionCount = idx.portionCount >= 0 ? number(row[idx.portionCount]) : null;
-        if (!name && carbs === null && fat === null && protein === null && calories === null && !portions && portionCount === null) output.rejected += 1;
-        else output.foodEvents.push([minute, name, round(carbs, 1), round(fat, 1), round(protein, 1), round(calories, 1), portions, round(portionCount, 2)]);
+        if (!name && carbs === null && fat === null && protein === null && calories === null && !portions && portionCount === null) {
+          output.rejected += 1;
+        } else {
+          output.foodEvents.push([
+            minute, name, round(carbs, 1), round(fat, 1), round(protein, 1),
+            round(calories, 1), portions, round(portionCount, 2),
+          ]);
+        }
       } else if (kind === 'manualInsulin') {
         const name = idx.name >= 0 ? clean(row[idx.name]).slice(0, 160) : '';
         const value = idx.value >= 0 ? number(row[idx.value]) : null;
@@ -212,13 +230,15 @@
   function parseClinicalCsvExtended(source, filename = '') {
     const parsedExtra = parseExtraCsv(source, filename);
     if (parsedExtra) return parsedExtra;
-    if (typeof baseParse !== 'function') throw new Error(`Dateityp nicht erkannt (${filename || 'unbekannt'}).`);
+    if (typeof baseParse !== 'function') {
+      throw new Error(`Dateityp nicht erkannt (${filename || 'unbekannt'}).`);
+    }
     return baseParse(source, filename);
   }
 
-  function dedupe(rows, key) {
+  function dedupe(sourceRows, key) {
     const map = new Map();
-    for (const row of rows || []) {
+    for (const row of sourceRows || []) {
       if (!Array.isArray(row) || !Number.isFinite(Number(row[0]))) continue;
       map.set(key(row), row);
     }
@@ -264,7 +284,7 @@
   }
 
   function formatExtended(summary) {
-    const baseParts = [
+    const parts = [
       [summary.cgmAdded, 'CGM-Werte'], [summary.bolusesAdded, 'Bolusereignisse'],
       [summary.dailyInsulinAdded, 'Tages-Insulinzeilen'], [summary.basalEventsAdded, 'Basalereignisse'],
       [summary.manualGlucoseAdded, 'manuelle Glukosewerte'], [summary.alarmsAdded, 'Alarme/Ereignisse'],
@@ -273,8 +293,8 @@
       [summary.medicationsAdded, 'Medikamente'], [summary.notesAdded, 'Notizen'],
     ].filter(([count]) => Number(count) > 0).map(([count, label]) => `${count} neue ${label}`);
     const kinds = [...new Set(summary.kinds || [])].map((kind) => LABELS[kind] || kind).join(', ');
-    if (!baseParts.length) baseParts.push('keine neuen Datenzeilen');
-    return `${baseParts.join(', ')}${kinds ? ` · erkannt: ${kinds}` : ''}${summary.rejected ? ` · ${summary.rejected} verworfen` : ''}`;
+    if (!parts.length) parts.push('keine neuen Datenzeilen');
+    return `${parts.join(', ')}${kinds ? ` · erkannt: ${kinds}` : ''}${summary.rejected ? ` · ${summary.rejected} verworfen` : ''}`;
   }
 
   function installBrowserPatch() {
@@ -303,12 +323,18 @@
         if (target) target.innerHTML = facts.map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`).join('');
         const last = gcState.lastImport || c.imports.at(-1);
         const summary = document.querySelector('#import-summary');
-        if (summary) summary.innerHTML = last ? `<div class="notice info"><strong>Letzter Import:</strong> ${formatExtended(last)}</div>` : '<p class="muted">Noch keine persönliche CSV in diesem Browser importiert.</p>';
+        if (summary) {
+          summary.innerHTML = last
+            ? `<div class="notice info"><strong>Letzter Import:</strong> ${formatExtended(last)}</div>`
+            : '<p class="muted">Noch keine persönliche CSV in diesem Browser importiert.</p>';
+        }
       };
     }
 
     const description = document.querySelector('.import-drop p');
-    if (description) description.innerHTML = '<strong>Kompletter Omnipod-Export:</strong> Alle CSV-Dateien des Exports können gemeinsam ausgewählt werden. Leere Kontextdateien werden erkannt und ohne Fehler akzeptiert.';
+    if (description) {
+      description.innerHTML = '<strong>Kompletter Omnipod-Export:</strong> Alle CSV-Dateien des Exports können gemeinsam ausgewählt werden. Leere Kontextdateien werden erkannt und ohne Fehler akzeptiert.';
+    }
 
     const input = document.querySelector('#csv-files');
     const button = document.querySelector('#import-csv');
@@ -317,7 +343,9 @@
         const progress = document.querySelector('#import-progress');
         try {
           const parsed = [];
-          for (const file of input.files || []) parsed.push(parseClinicalCsvExtended(await file.text(), file.name));
+          for (const file of input.files || []) {
+            parsed.push(parseClinicalCsvExtended(await file.text(), file.name));
+          }
           if (!parsed.length) throw new Error('Keine CSV-Dateien ausgewählt.');
           const merged = mergeClinicalExtended(gcState.clinical, parsed);
           gcState.clinical = merged.clinical;
@@ -336,32 +364,36 @@
     }
 
     const backupInput = document.querySelector('#import-all');
-    if (backupInput) backupInput.onchange = async (event) => {
-      try {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const payload = JSON.parse(await file.text());
-        if (!Array.isArray(payload.diary) || !payload.clinical) throw new Error('Ungültige Gesamtsicherung');
-        gcState.diary = payload.diary;
-        gcState.clinical = normalizeClinicalExtended(payload.clinical);
-        gcState.lastImport = null;
-        gcSave();
-        gcRender();
-      } catch (error) {
-        alert(error.message);
-      }
-      event.target.value = '';
-    };
+    if (backupInput) {
+      backupInput.onchange = async (event) => {
+        try {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const payload = JSON.parse(await file.text());
+          if (!Array.isArray(payload.diary) || !payload.clinical) throw new Error('Ungültige Gesamtsicherung');
+          gcState.diary = payload.diary;
+          gcState.clinical = normalizeClinicalExtended(payload.clinical);
+          gcState.lastImport = null;
+          gcSave();
+          gcRender();
+        } catch (error) {
+          alert(error.message);
+        }
+        event.target.value = '';
+      };
+    }
 
     const clearButton = document.querySelector('#clear-clinical');
-    if (clearButton) clearButton.onclick = () => {
-      if (confirm('Lokale CGM-/Bolus- und Kontextdaten löschen?')) {
-        gcState.clinical = normalizeClinicalExtended({});
-        gcState.lastImport = null;
-        gcSave();
-        gcRender();
-      }
-    };
+    if (clearButton) {
+      clearButton.onclick = () => {
+        if (confirm('Lokale CGM-/Bolus- und Kontextdaten löschen?')) {
+          gcState.clinical = normalizeClinicalExtended({});
+          gcState.lastImport = null;
+          gcSave();
+          gcRender();
+        }
+      };
+    }
 
     gcSave();
     gcRender();
