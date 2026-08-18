@@ -22,16 +22,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js; do
             test -s "$file"
           done
           python - <<'PY'
           from pathlib import Path
 
-          text = "\n".join(
-              Path(path).read_text(encoding="utf-8")
-              for path in ("docs/index.html", "docs/styles.css", "docs/app-v3.js")
+          paths = (
+              "docs/index.html",
+              "docs/styles.css",
+              "docs/app-v3.js",
+              "docs/app-v3-core.js",
+              "docs/app-importers.js",
           )
+          text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
               "Ein neuer Browser startet ohne Gesundheitsdaten",
               "Noch keine persönlichen CGM-Daten",
@@ -41,6 +45,12 @@ jobs:
               "parseClinicalCsv",
               "Mahlzeitenanalyse",
               "localStorage",
+              "app-v3-core.js",
+              "app-importers.js",
+              "insulin_data_*.csv",
+              "basal_data_*.csv",
+              "bg_data_*.csv",
+              "alarms_data_*.csv",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
