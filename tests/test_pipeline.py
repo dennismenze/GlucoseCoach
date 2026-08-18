@@ -63,9 +63,9 @@ class PipelineTests(unittest.TestCase):
             "mealResponse": {"byPeriod": [{
                 "label": "Frühstück 05–11",
                 "events": 12,
-                "medianPeak": 202,
-                "medianPeakDelta": 65,
-                "medianMinutesToPeak": 95,
+                "medianPeak": 210,
+                "medianPeakDelta": 70,
+                "medianMinutesToPeak": 90,
             }]},
         }
         items = build_dataset.build_recommendations(summary)
