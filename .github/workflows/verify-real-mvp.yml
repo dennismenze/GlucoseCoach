@@ -1,4 +1,4 @@
-name: Verify real-data MVP
+name: Verify personal-local MVP
 
 on:
   push:
@@ -17,61 +17,51 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify modular Sites build
+
+      - name: Verify public site has no patient baseline
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-core.js docs/app-analysis.js docs/app-render.js docs/app-events.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js; do
             test -s "$file"
           done
           python - <<'PY'
           from pathlib import Path
 
-          paths = [
-              Path('docs/index.html'),
-              Path('docs/styles.css'),
-              Path('docs/app-core.js'),
-              Path('docs/app-analysis.js'),
-              Path('docs/app-render.js'),
-              Path('docs/app-events.js'),
-          ]
-          text = '\n'.join(path.read_text(encoding='utf-8') for path in paths)
+          text = "\n".join(
+              Path(path).read_text(encoding="utf-8")
+              for path in ("docs/index.html", "docs/styles.css", "docs/app-v3.js")
+          )
           required = [
-              '25.382 echte CGM-Werte',
-              '82.22',
-              '138.5',
-              '6.62',
-              '32.5',
-              'Frühstück gezielt protokollieren',
-              'Abendliche Hochphasen',
-              '18–20 Uhr als Niedrig-Zeitfenster markieren',
-              'localStorage',
-              'glucosecoach-clinical-v1',
-              'parseClinicalCsv',
-              'Mahlzeitenanalyse',
+              "Ein neuer Browser startet ohne Gesundheitsdaten",
+              "Noch keine persönlichen CGM-Daten",
+              "glucosecoach-profile-v1",
+              "glucosecoach-diary-v1",
+              "glucosecoach-clinical-v1",
+              "parseClinicalCsv",
+              "Mahlzeitenanalyse",
+              "localStorage",
+          ]
+          forbidden = [
+              "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
+              "Veröffentlichter Ausgangsstand", "07.05.–04.08.2026",
+              "202 mg/dl", "95 Minuten", "STATIC_BASELINE", ".eml",
           ]
           missing = [value for value in required if value not in text]
+          leaks = [value for value in forbidden if value in text]
           if missing:
-              raise SystemExit(f'Missing required real-data/Sites content: {missing}')
-
-          forbidden = [
-              'stephanmenze' + '@' + 'gmx.de',
-              'stephanmenze' + '@' + 'icloud.com',
-              'Daten - (stephanmenze',
-              'Banane, Himbeeren, Haferpops, Milch',
-              'Konnte nicht in Steuergerät eingegeben werden',
-              '.eml',
-          ]
-          leaks = [value for value in forbidden if value.lower() in text.lower()]
+              raise SystemExit(f"Missing personal-local site contract: {missing}")
           if leaks:
-              raise SystemExit(f'Direct identifier/private entry leak in Sites build: {leaks}')
-          print('Sites build verified')
+              raise SystemExit(f"Published patient baseline leaked into site: {leaks}")
+          print("Personal-local site verified")
           PY
+
       - name: Run repository validator
         shell: bash
         run: |
           set -euo pipefail
           python scripts/validate_project.py
+
       - name: Run unit and browser-logic tests
         shell: bash
         run: |
