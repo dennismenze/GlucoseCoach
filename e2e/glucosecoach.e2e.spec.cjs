@@ -21,10 +21,24 @@ const SEEDS = [0x51a7c0de, 0x0badc0de, 0xc001d00d];
 const WINDOW_VALUES = ['7', '14', '30', '90', 'all'];
 
 function filePayload(file) {
+  let content = file.content;
+  // The synthetic note text deliberately contains commas. Encode that field
+  // as valid CSV instead of accidentally testing a malformed fixture.
+  if (file.name.startsWith('notes_data_')) {
+    const lines = content.split('\n');
+    content = lines.map((line, index) => {
+      if (index < 2) return line;
+      const separator = line.indexOf(',');
+      if (separator < 0) return line;
+      const timestamp = line.slice(0, separator);
+      const value = line.slice(separator + 1).replace(/"/g, '""');
+      return `${timestamp},"${value}"`;
+    }).join('\n');
+  }
   return {
     name: file.name,
     mimeType: 'text/csv',
-    buffer: Buffer.from(file.content, 'utf8'),
+    buffer: Buffer.from(content, 'utf8'),
   };
 }
 
