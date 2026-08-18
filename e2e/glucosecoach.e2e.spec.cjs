@@ -302,7 +302,7 @@ async function runScenario(page, fixture) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto('/');
-  await expect(page.locator('.import-drop p')).toContainText('Kompletter Omnipod-Export');
+  await expect(page.locator('.import-drop p').first()).toContainText('Kompletter Omnipod-Export');
   await expect(page.locator('nav button')).toHaveCount(6);
 
   await addDiaryEntriesThroughUi(page, fixture.diary);
