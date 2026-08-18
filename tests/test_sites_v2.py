@@ -120,8 +120,6 @@ class PersonalSitesContractTests(unittest.TestCase):
         subprocess.run(
             ["node", str(ROOT / "tests" / "sites_logic_test.cjs")],
             check=True,
-            capture_output=True,
-            text=True,
         )
 
 

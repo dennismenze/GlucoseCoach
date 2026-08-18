@@ -21,10 +21,24 @@ const SEEDS = [0x51a7c0de, 0x0badc0de, 0xc001d00d];
 const WINDOW_VALUES = ['7', '14', '30', '90', 'all'];
 
 function filePayload(file) {
+  let content = file.content;
+  // The synthetic note text deliberately contains commas. Encode that field
+  // as valid CSV instead of accidentally testing a malformed fixture.
+  if (file.name.startsWith('notes_data_')) {
+    const lines = content.split('\n');
+    content = lines.map((line, index) => {
+      if (index < 2) return line;
+      const separator = line.indexOf(',');
+      if (separator < 0) return line;
+      const timestamp = line.slice(0, separator);
+      const value = line.slice(separator + 1).replace(/"/g, '""');
+      return `${timestamp},"${value}"`;
+    }).join('\n');
+  }
   return {
     name: file.name,
     mimeType: 'text/csv',
-    buffer: Buffer.from(file.content, 'utf8'),
+    buffer: Buffer.from(content, 'utf8'),
   };
 }
 
@@ -75,6 +89,9 @@ async function expectGridValue(item, label, expected) {
 
 async function addDiaryEntriesThroughUi(page, entries) {
   for (const entry of entries) {
+    // The real form uses step="0.25" for sleep. Keep randomized values valid
+    // so the browser's native constraint validation does not block submit.
+    entry.sleep = String(Math.round(Number(entry.sleep) * 4) / 4);
     await clickTab(page, 'diary');
     await page.locator('#when').fill(entry.when);
     await page.locator('#occasion').selectOption({ label: entry.occasion });
@@ -302,7 +319,7 @@ async function runScenario(page, fixture) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto('/');
-  await expect(page.locator('.import-drop p')).toContainText('Kompletter Omnipod-Export');
+  await expect(page.locator('.import-drop p').first()).toContainText('Kompletter Omnipod-Export');
   await expect(page.locator('nav button')).toHaveCount(6);
 
   await addDiaryEntriesThroughUi(page, fixture.diary);
