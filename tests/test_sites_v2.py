@@ -7,69 +7,73 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
-JS = "\n".join((ROOT / "docs" / name).read_text(encoding="utf-8") for name in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"))
+JS = (ROOT / "docs" / "app-v3.js").read_text(encoding="utf-8")
 BUNDLE = HTML + "\n" + JS
 
 
-class SitesV2ContractTests(unittest.TestCase):
-    def test_existing_diary_storage_is_migrated_by_key_stability(self) -> None:
-        self.assertIn("const DIARY_KEY = 'glucosecoach-diary-v1'", JS)
-        self.assertIn("Bestehende Einträge aus der bisherigen Version", HTML)
+class PersonalSitesContractTests(unittest.TestCase):
+    def test_new_browser_has_no_published_patient_baseline(self) -> None:
+        forbidden = [
+            "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
+            "Veröffentlichter Ausgangsstand", "07.05.–04.08.2026",
+            "202 mg/dl", "95 Minuten", "STATIC_BASELINE",
+        ]
+        leaks = [value for value in forbidden if value in BUNDLE]
+        self.assertFalse(leaks, f"published patient baseline leaked into public site: {leaks}")
+
+    def test_storage_is_personal_and_browser_local(self) -> None:
+        required = [
+            "glucosecoach-profile-v1",
+            "glucosecoach-diary-v1",
+            "glucosecoach-clinical-v1",
+            "Ein neuer Browser startet ohne Gesundheitsdaten",
+            "Noch keine persönlichen CGM-Daten",
+            "Es werden keine Beispielwerte oder Daten anderer Nutzer eingeblendet",
+            "localStorage",
+        ]
+        missing = [value for value in required if value not in BUNDLE]
+        self.assertFalse(missing, f"missing personal-local markers: {missing}")
 
     def test_csv_append_and_recalculation_are_present(self) -> None:
         required = [
-            "glucosecoach-clinical-v1",
             "parseClinicalCsv",
             "mergeClinical",
             "dedupeCgm",
             "dedupeBoluses",
             "Eintrag speichern und neu berechnen",
             "Ausgewählte CSV lokal importieren",
-            "Überlappende Zeiträume werden automatisch dedupliziert",
-            "renderAll();",
+            "gcRender()",
         ]
         missing = [value for value in required if value not in BUNDLE]
-        self.assertFalse(missing, f"missing Sites v2 contract markers: {missing}")
+        self.assertFalse(missing, f"missing recalculation markers: {missing}")
 
-    def test_meal_analysis_has_explicit_methodological_boundary(self) -> None:
+    def test_meal_analysis_keeps_methodological_boundary(self) -> None:
         required = [
-            "ersten nachhaltigen Anstieg",
+            "erster nachhaltiger Anstieg",
             "CGM-Wendepunkt-Proxy",
-            "nicht als pharmakologischer Wirkeintritt",
+            "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
             "kein passender positiver Bolus gefunden",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing analysis boundaries: {missing}")
 
-    def test_original_verified_baseline_remains_available(self) -> None:
-        for value in ["25382", "138.5", "6.62", "32.5", "82.22", "16.55"]:
-            self.assertIn(value, BUNDLE)
-        self.assertIn("Veröffentlichter Ausgangsstand 07.05.–04.08.2026", HTML)
-        self.assertIn("nicht rechnerisch mit dem Aggregat vermischt", BUNDLE)
-
-    def test_no_direct_identifiers_or_user_entries_are_hardcoded(self) -> None:
-        forbidden = [
-            "stephanmenze" + "@" + "gmx.de",
-            "stephanmenze" + "@" + "icloud.com",
-            "Daten - (stephanmenze",
-            "Banane, Himbeeren, Haferpops, Milch",
-            "Konnte nicht in Steuergerät eingegeben werden",
-        ]
-        leaks = [value for value in forbidden if value.lower() in BUNDLE.lower()]
-        self.assertFalse(leaks, f"private source content leaked into Sites file: {leaks}")
+    def test_no_direct_identifier_or_email_is_hardcoded(self) -> None:
         self.assertIsNone(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", BUNDLE))
 
-    def test_app_script_is_exportable_for_logic_tests(self) -> None:
-        self.assertIn('<script src="app-core.js"></script>', HTML)
-        self.assertIn('<script src="app-analysis.js"></script>', HTML)
-        self.assertIn('<script src="app-render.js"></script>', HTML)
-        self.assertIn('<script src="app-events.js"></script>', HTML)
+    def test_only_personal_bundle_is_loaded(self) -> None:
+        self.assertIn('<script src="app-v3.js"></script>', HTML)
+        for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
+            self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
         self.assertIn("module.exports", JS)
-        self.assertIn("if (typeof document !== 'undefined') bootstrap();", JS)
 
     def test_node_logic_suite(self) -> None:
-        subprocess.run(["node", str(ROOT / "tests" / "sites_logic_test.cjs")], check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["node", str(ROOT / "tests" / "sites_logic_test.cjs")],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 if __name__ == "__main__":
