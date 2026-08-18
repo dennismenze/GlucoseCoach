@@ -75,6 +75,9 @@ async function expectGridValue(item, label, expected) {
 
 async function addDiaryEntriesThroughUi(page, entries) {
   for (const entry of entries) {
+    // The real form uses step="0.25" for sleep. Keep randomized values valid
+    // so the browser's native constraint validation does not block submit.
+    entry.sleep = String(Math.round(Number(entry.sleep) * 4) / 4);
     await clickTab(page, 'diary');
     await page.locator('#when').fill(entry.when);
     await page.locator('#occasion').selectOption({ label: entry.occasion });
