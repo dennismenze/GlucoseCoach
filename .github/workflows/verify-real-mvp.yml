@@ -17,12 +17,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
 
       - name: Verify public site has no patient baseline
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js; do
             test -s "$file"
           done
           python - <<'PY'
@@ -35,6 +38,7 @@ jobs:
               "docs/app-v3-core.js",
               "docs/app-importers.js",
               "docs/app-importers-context.js",
+              "docs/app-ui-contract.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
@@ -49,6 +53,7 @@ jobs:
               "app-v3-core.js",
               "app-importers.js",
               "app-importers-context.js",
+              "app-ui-contract.js",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
@@ -59,6 +64,7 @@ jobs:
               "manual_insulin_data_",
               "medication_data_",
               "notes_data_",
+              "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
@@ -73,6 +79,14 @@ jobs:
               raise SystemExit(f"Published patient baseline leaked into site: {leaks}")
           print("Personal-local site verified")
           PY
+
+      - name: Syntax-check E2E suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check e2e/oracle.cjs
+          node --check e2e/glucosecoach.e2e.spec.cjs
+          node --check playwright.config.cjs
 
       - name: Run repository validator
         shell: bash
