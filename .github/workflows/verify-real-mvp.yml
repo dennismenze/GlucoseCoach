@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js; do
             test -s "$file"
           done
           python - <<'PY'
@@ -34,6 +34,7 @@ jobs:
               "docs/app-v3.js",
               "docs/app-v3-core.js",
               "docs/app-importers.js",
+              "docs/app-importers-context.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
@@ -47,10 +48,17 @@ jobs:
               "localStorage",
               "app-v3-core.js",
               "app-importers.js",
+              "app-importers-context.js",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
               "alarms_data_*.csv",
+              "cgm_carbs_data_",
+              "exercise_data_",
+              "food_data_",
+              "manual_insulin_data_",
+              "medication_data_",
+              "notes_data_",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
