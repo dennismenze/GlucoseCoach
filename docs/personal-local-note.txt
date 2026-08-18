@@ -1,0 +1,1 @@
+GlucoseCoach public build: no prefilled patient data. Personal values are stored only in the visitor's browser and recalculated locally.
