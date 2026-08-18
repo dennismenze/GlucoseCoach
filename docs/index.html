@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>GlucoseCoach – lokale Verlaufsanalyse</title>
+  <title>GlucoseCoach – persönliches lokales Profil</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell">
     <header>
       <div>
-        <p class="eyebrow">Retrospektive Musteranalyse</p>
+        <p class="eyebrow">Persönliche retrospektive Musteranalyse</p>
         <h1>GlucoseCoach</h1>
-        <p class="lead">Tagebucheinträge bleiben erhalten, neue Omnipod-/CGM-CSV-Dateien können wiederholt ergänzt werden, und alle lokalen Kennzahlen, Mahlzeitenzuordnungen und Beobachtungen werden anschließend neu berechnet.</p>
+        <p class="lead">Ein neuer Browser startet ohne Gesundheitsdaten. Tagebuch, CGM- und Bolusdaten werden ausschließlich in diesem Browser gespeichert und daraus lokal neu berechnet. Es werden keine persönlichen Ausgangswerte mit der öffentlichen Website ausgeliefert.</p>
       </div>
-      <span id="header-badge" class="badge">25.382 echte CGM-Werte</span>
+      <span id="header-badge" class="badge">Lokales Profil</span>
     </header>
 
     <nav aria-label="Bereiche">
@@ -29,7 +29,7 @@
 
     <section id="overview" class="panel active">
       <div class="source-row">
-        <span id="source-pill" class="source-pill">Veröffentlichter Ausgangsstand 07.05.–04.08.2026</span>
+        <span id="source-pill" class="source-pill">Noch keine persönlichen CGM-Daten</span>
         <div class="window-controls">
           <label>Zeitraum
             <select id="window-days" disabled>
@@ -42,10 +42,11 @@
           </label>
         </div>
       </div>
-      <div id="metrics" class="grid"></div>
+      <div id="overview-empty" class="notice info">Noch keine CGM-Daten in diesem Browser. Unter „CSV-Daten“ einen persönlichen Export importieren; danach erscheinen hier ausschließlich daraus berechnete Werte.</div>
+      <div id="metrics" class="grid" style="margin-top:16px"></div>
       <div class="grid" style="margin-top:16px">
         <article class="card wide">
-          <h2 id="range-title">Bereichszeiten</h2>
+          <h2>Bereichszeiten</h2>
           <div class="rangebar" aria-label="Glukose-Bereichszeiten">
             <span id="range-very-low" class="very-low"></span>
             <span id="range-low" class="low"></span>
@@ -57,14 +58,14 @@
           <p id="range-note" class="muted"></p>
         </article>
         <aside class="card side">
-          <h2>Datengrundlage</h2>
+          <h2>Persönliche Datengrundlage</h2>
           <ul id="dataset-facts" class="facts"></ul>
         </aside>
       </div>
     </section>
 
     <section id="recommendations" class="panel">
-      <div class="notice"><strong>Automatisch neu berechnet:</strong> Die Karten berücksichtigen lokale CSV-Werte und die gespeicherten Tagebucheinträge. Sie beschreiben beobachtete Muster und Datenlücken, nicht Änderungen an Insulindosen oder Pumpeneinstellungen.</div>
+      <div class="notice"><strong>Nur persönliche Daten:</strong> Empfehlungen werden erst aus den in diesem Browser gespeicherten CSV- und Tagebuchdaten erzeugt. Fehlende Daten werden nicht mit Beispiel- oder fremden Patientendaten ersetzt.</div>
       <div id="recommendation-list" class="recommendations" style="margin-top:16px"></div>
     </section>
 
@@ -72,7 +73,7 @@
       <div class="grid">
         <article class="card full">
           <h2>Mahlzeiten mit CGM und Bolusereignissen verknüpfen</h2>
-          <p class="muted">Für jeden Tagebucheintrag werden CGM-Werte von 15 Minuten davor bis 180 Minuten danach gesucht. Als Kurvenmerkmale zeigt die App Ausgangswert, ersten nachhaltigen Anstieg, Peak und Zwei-Stunden-Wert. Ein nach einem passenden Bolus beobachteter Kurvenwendepunkt wird ausdrücklich nur als CGM-Proxy bezeichnet, nicht als pharmakologischer Wirkeintritt.</p>
+          <p class="muted">Für Tagebucheinträge werden CGM-Werte von 15 Minuten davor bis 180 Minuten danach gesucht. Angezeigt werden Ausgangswert, erster nachhaltiger Anstieg, Peak und Zwei-Stunden-Wert. Ein nach einem passenden Bolus beobachteter Kurvenwendepunkt ist nur ein retrospektiver CGM-Proxy und kein direkter pharmakologischer Wirkeintritt.</p>
           <div id="meal-summary" class="analysis-grid"></div>
         </article>
         <article class="card full">
@@ -87,7 +88,7 @@
               <tbody id="food-comparison"></tbody>
             </table>
           </div>
-          <p id="food-comparison-note" class="muted compact"></p>
+          <p id="food-comparison-note" class="muted compact">Mediane werden nur aus persönlichen, vollständig abgedeckten Ereignissen berechnet.</p>
         </article>
         <aside class="card side">
           <h2>Krankheit als Kontext</h2>
@@ -100,7 +101,7 @@
       <div class="grid">
         <article class="card wide">
           <h2>Kontext erfassen</h2>
-          <p class="muted">Bestehende Einträge aus der bisherigen Version werden unter demselben lokalen Speicherschlüssel weiterverwendet. Es erfolgt keine Übertragung.</p>
+          <p class="muted">Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel kann eine Gesamtsicherung exportiert und wieder importiert werden.</p>
           <form id="diary-form">
             <div class="form-grid">
               <label>Zeitpunkt<input id="when" type="datetime-local" required></label>
@@ -135,10 +136,10 @@
     <section id="import-data" class="panel">
       <div class="grid">
         <article class="card wide">
-          <h2>Aktuelle Omnipod-/CGM-CSV ergänzen</h2>
+          <h2>Persönliche Omnipod-/CGM-CSV ergänzen</h2>
           <div class="import-drop">
             <p><strong>Mehrere Dateien gleichzeitig auswählen:</strong> insbesondere <code>cgm_data_*.csv</code> und <code>bolus_data_*.csv</code>. Metadatenzeilen und nicht benötigte Spalten werden verworfen.</p>
-            <p class="muted">Bereits vorhandene Zeitpunkte werden dedupliziert. Dadurch lassen sich überlappende Exporte und spätere Zeiträume wiederholt hinzufügen.</p>
+            <p class="muted">Bereits gespeicherte Zeitpunkte werden dedupliziert. Die Dateien werden nur im Browser gelesen; die Rohdateien werden nicht an GitHub oder einen anderen Server übertragen.</p>
             <div class="actions">
               <label class="file-button">CSV-Dateien auswählen<input id="csv-files" type="file" accept=".csv,text/csv" multiple hidden></label>
               <button id="import-csv" class="primary" type="button">Ausgewählte CSV lokal importieren</button>
@@ -158,8 +159,8 @@
           </div>
         </aside>
         <article class="card full">
-          <h2>Was nach dem Import passiert</h2>
-          <p>Die App berechnet Bereichszeiten, Mittelwert, GMI-Schätzung, Variabilität, zeitliche Hoch-/Niedrigmuster sowie die Zuordnung zu Tagebucheinträgen vollständig im Browser neu. Die Rohdateien werden weder hochgeladen noch als Datei gespeichert; lokal verbleiben nur die benötigten de-identifizierten Mess- und Ereignisfelder.</p>
+          <h2>Speichermodell</h2>
+          <p>Die öffentliche Seite enthält keinen Patientendatensatz. Jeder Browser besitzt seinen eigenen lokalen Datenbestand. Alle Kennzahlen, Zeitmuster, Mahlzeitenvergleiche und Empfehlungen werden ausschließlich aus diesem Bestand erzeugt.</p>
         </article>
       </div>
     </section>
@@ -177,12 +178,8 @@
       </article>
     </section>
 
-    <footer>Nur retrospektive Entscheidungsunterstützung. Keine Diagnose, keine automatische Insulindosierung und kein Ersatz für Pumpen-/CGM-Alarme oder den individuell vereinbarten Behandlungsplan.</footer>
+    <footer>Retrospektive Musteranalyse aus dem persönlichen lokalen Datenbestand. Keine Diagnose, keine automatische Insulindosierung und kein Ersatz für Pumpen-/CGM-Alarme oder den individuell vereinbarten Behandlungsplan.</footer>
   </main>
-
-  <script src="app-core.js"></script>
-  <script src="app-analysis.js"></script>
-  <script src="app-render.js"></script>
-  <script src="app-events.js"></script>
+  <script src="app-v3.js"></script>
 </body>
 </html>
