@@ -2,31 +2,32 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'docs', 'index.html'), 'utf8');
+const loader = fs.readFileSync(path.join(root, 'docs', 'app-v3.js'), 'utf8');
 const core = fs.readFileSync(path.join(root, 'docs', 'app-v3-core.js'), 'utf8');
 const importers = fs.readFileSync(path.join(root, 'docs', 'app-importers.js'), 'utf8');
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glucosecoach-sites-'));
-const scriptPath = path.join(tempDir, 'app.cjs');
-fs.writeFileSync(scriptPath, `${core}\n${importers}\n`);
-const analytics = require(scriptPath);
+const contextImporters = fs.readFileSync(path.join(root, 'docs', 'app-importers-context.js'), 'utf8');
+const analytics = require(path.join(root, 'docs', 'app-v3.js'));
 
 const minute = (iso) => Math.round(new Date(iso).getTime() / 60000);
 
 assert.equal(analytics.GC_DIARY_KEY, 'glucosecoach-diary-v1');
 assert.equal(analytics.GC_CLINICAL_KEY, 'glucosecoach-clinical-v1');
 assert.equal(analytics.GC_PROFILE_KEY, 'glucosecoach-profile-v1');
+assert(loader.includes('app-v3-core.js'));
+assert(loader.includes('app-importers.js'));
+assert(loader.includes('app-importers-context.js'));
 
 for (const forbidden of [
   '25.382', '25382', '138.5', '6.62', '82.22', '16.55',
   'Veröffentlichter Ausgangsstand', 'STATIC_BASELINE',
 ]) {
-  assert(!html.includes(forbidden), `HTML contains published patient baseline: ${forbidden}`);
-  assert(!core.includes(forbidden), `core contains published patient baseline: ${forbidden}`);
-  assert(!importers.includes(forbidden), `importers contain published patient baseline: ${forbidden}`);
+  for (const [name, text] of [['HTML', html], ['core', core], ['importers', importers], ['context importers', contextImporters]]) {
+    assert(!text.includes(forbidden), `${name} contains published patient baseline: ${forbidden}`);
+  }
 }
 
 const cgmCsv = [
@@ -73,11 +74,11 @@ assert.equal(parsedBasal.boluses.length, 0, 'basal rows must never be misclassif
 const bgCsv = [
   'Metadata',
   'Zeitstempel,Glukosewert (mg/dl),Manuelles Lesen',
-  '17.08.2026 08:05,123,Ja',
+  '17.08.2026 08:05,123,M',
 ].join('\n');
 const parsedBg = analytics.parseClinicalCsv(bgCsv, 'bg_data_1.csv');
 assert.equal(parsedBg.kind, 'bg');
-assert.deepEqual(parsedBg.manualGlucose[0].slice(1), [123, 'Ja']);
+assert.deepEqual(parsedBg.manualGlucose[0].slice(1), [123, 'M']);
 
 const alarmCsv = [
   'Metadata',
@@ -87,6 +88,55 @@ const alarmCsv = [
 const parsedAlarm = analytics.parseClinicalCsv(alarmCsv, 'alarms_data_1.csv');
 assert.equal(parsedAlarm.kind, 'alarm');
 assert.equal(parsedAlarm.alarms[0][1], 'Pod abgelaufen');
+
+const emptyCgmCarbs = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,KH (g)\n',
+  'cgm_carbs_data_1.csv',
+);
+assert.equal(emptyCgmCarbs.kind, 'cgmCarbs');
+assert.equal(emptyCgmCarbs.cgmCarbs.length, 0, 'empty cgm_carbs export must be accepted');
+assert.equal(emptyCgmCarbs.rejected, 0);
+
+const parsedCgmCarbs = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,KH (g)\n17.08.2026 08:45,"12,5"\n',
+  'cgm_carbs_data_1.csv',
+);
+assert.deepEqual(parsedCgmCarbs.cgmCarbs[0].slice(1), [12.5]);
+
+const parsedExercise = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,Name,Intensität,Dauer (Minuten),Verbrannte Kalorien\n17.08.2026 18:00,Spaziergang,Mittel,30,120\n',
+  'exercise_data_1.csv',
+);
+assert.equal(parsedExercise.kind, 'exercise');
+assert.equal(parsedExercise.exerciseEvents.length, 1);
+
+const parsedFood = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,Name,KH (g),Fett,Eiweiß,Kalorien,Portionen,Anzahl der Portionen\n17.08.2026 09:00,Frühstück,"46,2","7,9","9,7",300,Schale,1\n',
+  'food_data_1.csv',
+);
+assert.equal(parsedFood.kind, 'food');
+assert.equal(parsedFood.foodEvents[0][2], 46.2);
+
+const parsedManualInsulin = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,Name,Wert,Insulin-Typ\n17.08.2026 11:00,Korrektur,"1,5",Schnell\n',
+  'manual_insulin_data_1.csv',
+);
+assert.equal(parsedManualInsulin.kind, 'manualInsulin');
+assert.equal(parsedManualInsulin.manualInsulin[0][2], 1.5);
+
+const parsedMedication = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,Name,Wert,Medikamententyp\n17.08.2026 12:00,Beispiel,1,Tablette\n',
+  'medication_data_1.csv',
+);
+assert.equal(parsedMedication.kind, 'medication');
+assert.equal(parsedMedication.medications.length, 1);
+
+const parsedNote = analytics.parseClinicalCsv(
+  'Metadata\nZeitstempel,Wert\n17.08.2026 13:00,Testnotiz\n',
+  'notes_data_1.csv',
+);
+assert.equal(parsedNote.kind, 'note');
+assert.equal(parsedNote.notes[0][1], 'Testnotiz');
 
 const metrics = analytics.calculateMetrics([
   [minute('2026-08-17T10:00:00'), 100, 0],
@@ -122,7 +172,10 @@ assert(emptyCards[0].boundary.includes('keine Beispielwerte'));
 
 const merged = analytics.mergeClinical(
   { cgm: [], boluses: [], imports: [], updatedAt: null },
-  [parsedCgm, parsedBolus, parsedInsulin, parsedBasal, parsedBg, parsedAlarm],
+  [
+    parsedCgm, parsedBolus, parsedInsulin, parsedBasal, parsedBg, parsedAlarm,
+    parsedCgmCarbs, parsedExercise, parsedFood, parsedManualInsulin, parsedMedication, parsedNote,
+  ],
 );
 assert.equal(merged.clinical.cgm.length, 3);
 assert.equal(merged.clinical.boluses.length, 1);
@@ -130,6 +183,12 @@ assert.equal(merged.clinical.dailyInsulin.length, 1);
 assert.equal(merged.clinical.basalEvents.length, 1);
 assert.equal(merged.clinical.manualGlucose.length, 1);
 assert.equal(merged.clinical.alarms.length, 1);
-assert.equal(merged.summary.files, 6);
+assert.equal(merged.clinical.cgmCarbs.length, 1);
+assert.equal(merged.clinical.exerciseEvents.length, 1);
+assert.equal(merged.clinical.foodEvents.length, 1);
+assert.equal(merged.clinical.manualInsulin.length, 1);
+assert.equal(merged.clinical.medications.length, 1);
+assert.equal(merged.clinical.notes.length, 1);
+assert.equal(merged.summary.files, 12);
 
-console.log('GlucoseCoach personal-local + full Omnipod importer tests passed');
+console.log('GlucoseCoach personal-local + complete Omnipod importer tests passed');
