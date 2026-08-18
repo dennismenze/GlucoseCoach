@@ -25,11 +25,27 @@ Die App hat derzeit keine Benutzerkonten und keine Cloud-Synchronisation. Für m
 - lokale Zuordnung von Mahlzeiten zu CGM- und Bolusereignissen
 - Ausgangswert, nachhaltiger Anstieg, Peak, Zwei-Stunden-Wert und CGM-Kurvenwendepunkt-Proxy
 - Vergleiche wiederholt dokumentierter Mahlzeiten
-- JSON-Backup sowie wiederholbarer Omnipod-/CGM-CSV-Import
+- JSON-Backup sowie wiederholbarer Import des vollständigen Omnipod-CSV-Exports
 
 ## GitHub Pages
 
 Die veröffentlichte App liegt unter `docs/`. GitHub Pages liefert `main` + `/docs` aus.
+
+## Tests
+
+Die schnellen Vertrags- und Logiktests liegen unter `tests/`. Zusätzlich gibt es eine Playwright-E2E-Suite unter `e2e/`.
+
+Die E2E-Suite erzeugt für mehrere feste Seeds synthetische, aber physiologisch plausible CGM-Verläufe sowie alle zwölf unterstützten Omnipod-Datentypen. Sie trägt Tagebucheinträge über das echte Browserformular ein, importiert 13 CSV-Dateien über den echten File-Input und prüft anschließend alle sechs Tabs. Für 7, 14, 30 und 90 Tage sowie den Gesamtbestand werden sämtliche dargestellten dynamischen Zahlen gegen einen vom Rendering unabhängigen Oracle-Code abgeglichen. Dazu gehören Kennzahlen, Bereichszeiten, Datenbestandszähler, Empfehlungen, jede Zahl jeder Mahlzeitenkurve, Gruppenvergleiche, Krankheitsgruppen und Datenqualitätswerte.
+
+Lokal:
+
+```bash
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
+In GitHub Actions läuft die Suite mit Chromium und einem Worker, damit die seeded Zufallsszenarien reproduzierbar bleiben.
 
 ## Medizinische Grenze
 
