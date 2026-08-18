@@ -11,7 +11,8 @@ LOADER = (ROOT / "docs" / "app-v3.js").read_text(encoding="utf-8")
 CORE = (ROOT / "docs" / "app-v3-core.js").read_text(encoding="utf-8")
 IMPORTERS = (ROOT / "docs" / "app-importers.js").read_text(encoding="utf-8")
 CONTEXT_IMPORTERS = (ROOT / "docs" / "app-importers-context.js").read_text(encoding="utf-8")
-BUNDLE = "\n".join((HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS))
+UI_CONTRACT = (ROOT / "docs" / "app-ui-contract.js").read_text(encoding="utf-8")
+BUNDLE = "\n".join((HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT))
 
 
 class PersonalSitesContractTests(unittest.TestCase):
@@ -60,6 +61,7 @@ class PersonalSitesContractTests(unittest.TestCase):
             "manualInsulin",
             "medications",
             "notes",
+            "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing complete Omnipod importer markers: {missing}")
@@ -93,14 +95,26 @@ class PersonalSitesContractTests(unittest.TestCase):
 
     def test_loader_keeps_personal_bundle_modular(self) -> None:
         self.assertIn('<script src="app-v3.js"></script>', HTML)
-        self.assertIn("app-v3-core.js", LOADER)
-        self.assertIn("app-importers.js", LOADER)
-        self.assertIn("app-importers-context.js", LOADER)
+        for module in ("app-v3-core.js", "app-importers.js", "app-importers-context.js", "app-ui-contract.js"):
+            self.assertIn(module, LOADER)
         for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
             self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
-        self.assertIn("module.exports", CORE)
-        self.assertIn("module.exports", IMPORTERS)
-        self.assertIn("module.exports", CONTEXT_IMPORTERS)
+        for source in (CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT):
+            self.assertIn("module.exports", source)
+
+    def test_e2e_contract_is_present(self) -> None:
+        spec = ROOT / "e2e" / "glucosecoach.e2e.spec.cjs"
+        oracle = ROOT / "e2e" / "oracle.cjs"
+        config = ROOT / "playwright.config.cjs"
+        workflow = ROOT / ".github" / "workflows" / "e2e.yml"
+        for path in (spec, oracle, config, workflow):
+            self.assertTrue(path.is_file(), f"missing E2E artifact: {path.relative_to(ROOT)}")
+        spec_text = spec.read_text(encoding="utf-8")
+        self.assertIn("SEEDS", spec_text)
+        self.assertIn("WINDOW_VALUES = ['7', '14', '30', '90', 'all']", spec_text)
+        self.assertIn("assertStoredData", spec_text)
+        self.assertIn("assertMealAnalysis", spec_text)
+        self.assertIn("assertQuality", spec_text)
 
     def test_node_logic_suite(self) -> None:
         subprocess.run(
