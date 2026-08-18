@@ -10,7 +10,8 @@ HTML = (ROOT / "docs" / "index.html").read_text(encoding="utf-8")
 LOADER = (ROOT / "docs" / "app-v3.js").read_text(encoding="utf-8")
 CORE = (ROOT / "docs" / "app-v3-core.js").read_text(encoding="utf-8")
 IMPORTERS = (ROOT / "docs" / "app-importers.js").read_text(encoding="utf-8")
-BUNDLE = "\n".join((HTML, LOADER, CORE, IMPORTERS))
+CONTEXT_IMPORTERS = (ROOT / "docs" / "app-importers-context.js").read_text(encoding="utf-8")
+BUNDLE = "\n".join((HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS))
 
 
 class PersonalSitesContractTests(unittest.TestCase):
@@ -36,7 +37,7 @@ class PersonalSitesContractTests(unittest.TestCase):
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing personal-local markers: {missing}")
 
-    def test_complete_mvp_csv_set_is_supported(self) -> None:
+    def test_complete_omnipod_export_set_is_supported(self) -> None:
         required = [
             "cgm_data_*.csv",
             "bolus_data_*.csv",
@@ -44,14 +45,24 @@ class PersonalSitesContractTests(unittest.TestCase):
             "basal_data_*.csv",
             "bg_data_*.csv",
             "alarms_data_*.csv",
+            "cgm_carbs_data_",
+            "exercise_data_",
+            "food_data_",
+            "manual_insulin_data_",
+            "medication_data_",
+            "notes_data_",
             "dailyInsulin",
             "basalEvents",
             "manualGlucose",
-            "alarms",
-            "Basalzeilen werden nicht als Bolus behandelt",
+            "cgmCarbs",
+            "exerciseEvents",
+            "foodEvents",
+            "manualInsulin",
+            "medications",
+            "notes",
         ]
-        missing = [value for value in required if value not in IMPORTERS]
-        self.assertFalse(missing, f"missing full Omnipod importer markers: {missing}")
+        missing = [value for value in required if value not in BUNDLE]
+        self.assertFalse(missing, f"missing complete Omnipod importer markers: {missing}")
 
     def test_csv_append_and_recalculation_are_present(self) -> None:
         required = [
@@ -84,10 +95,12 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn('<script src="app-v3.js"></script>', HTML)
         self.assertIn("app-v3-core.js", LOADER)
         self.assertIn("app-importers.js", LOADER)
+        self.assertIn("app-importers-context.js", LOADER)
         for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
             self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
         self.assertIn("module.exports", CORE)
         self.assertIn("module.exports", IMPORTERS)
+        self.assertIn("module.exports", CONTEXT_IMPORTERS)
 
     def test_node_logic_suite(self) -> None:
         subprocess.run(
