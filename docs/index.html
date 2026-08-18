@@ -4,120 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>GlucoseCoach – Echt­daten-MVP</title>
-  <style>
-    :root {
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #172033;
-      background: #eef3f8;
-      --surface: rgba(255,255,255,.92);
-      --surface-strong: #fff;
-      --line: #d8e1eb;
-      --muted: #607087;
-      --accent: #166a74;
-      --accent-soft: #dff2f1;
-      --high: #9a4b16;
-      --high-soft: #fff0df;
-      --low: #8e2c45;
-      --low-soft: #fde7ed;
-      --shadow: 0 18px 50px rgba(27, 48, 75, .10);
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top left, #dcefeb 0, transparent 36rem), #eef3f8; }
-    button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; }
-    .shell { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 56px; }
-    header { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
-    .eyebrow { margin: 0 0 7px; color: var(--accent); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: .75rem; }
-    h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.65rem); line-height: .98; letter-spacing: -.045em; }
-    .lead { max-width: 760px; margin: 14px 0 0; color: var(--muted); line-height: 1.55; }
-    .badge { flex: none; padding: 9px 12px; border: 1px solid #aad2ce; background: var(--accent-soft); color: #115860; border-radius: 999px; font-size: .82rem; font-weight: 800; }
-    nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-    nav button { border: 1px solid var(--line); background: var(--surface); color: #34445a; padding: 10px 14px; border-radius: 12px; font-weight: 750; }
-    nav button[aria-selected="true"] { background: #172033; color: #fff; border-color: #172033; }
-    .panel { display: none; }
-    .panel.active { display: block; }
-    .card { background: var(--surface); border: 1px solid rgba(209,220,232,.9); border-radius: 20px; box-shadow: var(--shadow); padding: 22px; backdrop-filter: blur(12px); }
-    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
-    .metric { grid-column: span 3; min-height: 142px; }
-    .metric .value { font-size: clamp(1.7rem, 4vw, 2.55rem); font-weight: 850; letter-spacing: -.04em; margin-top: 18px; }
-    .metric .label { color: var(--muted); font-size: .9rem; }
-    .metric .sub { color: var(--muted); font-size: .78rem; margin-top: 5px; }
-    .wide { grid-column: span 8; }
-    .side { grid-column: span 4; }
-    h2, h3 { margin-top: 0; letter-spacing: -.025em; }
-    h2 { font-size: 1.45rem; }
-    h3 { font-size: 1.05rem; }
-    .rangebar { display: grid; grid-template-columns: 1.23fr 82.22fr 16.55fr; height: 18px; border-radius: 999px; overflow: hidden; background: #ccd6e0; margin: 18px 0 10px; }
-    .rangebar span:nth-child(1) { background: #bd4b68; }
-    .rangebar span:nth-child(2) { background: #2d8b82; }
-    .rangebar span:nth-child(3) { background: #d67e32; }
-    .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: .82rem; }
-    .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 11px; }
-    .facts li { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-    .facts li:last-child { border: 0; padding-bottom: 0; }
-    .facts span { color: var(--muted); }
-    .recommendations { display: grid; gap: 16px; }
-    .rec { border-left: 5px solid var(--accent); }
-    .rec.high { border-left-color: var(--high); }
-    .rec.low { border-left-color: var(--low); }
-    .rec-head { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
-    .rec-tag { flex: none; border-radius: 999px; padding: 5px 9px; background: var(--accent-soft); color: var(--accent); font-size: .72rem; font-weight: 850; text-transform: uppercase; letter-spacing: .05em; }
-    .high .rec-tag { background: var(--high-soft); color: var(--high); }
-    .low .rec-tag { background: var(--low-soft); color: var(--low); }
-    .rec dl { display: grid; grid-template-columns: 110px 1fr; gap: 8px 14px; margin: 17px 0 0; }
-    .rec dt { color: var(--muted); font-weight: 750; }
-    .rec dd { margin: 0; line-height: 1.48; }
-    .notice { border: 1px solid #b8d9d6; background: var(--accent-soft); border-radius: 16px; padding: 15px 17px; line-height: 1.5; color: #174e54; }
-    form { display: grid; gap: 16px; }
-    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-    label { display: grid; gap: 6px; font-size: .85rem; font-weight: 750; color: #415169; }
-    label.full { grid-column: 1 / -1; }
-    input, textarea, select { width: 100%; border: 1px solid #cbd6e2; border-radius: 11px; padding: 11px 12px; background: var(--surface-strong); color: inherit; }
-    textarea { min-height: 100px; resize: vertical; }
-    .actions { display: flex; flex-wrap: wrap; gap: 9px; }
-    .primary, .secondary, .danger { border-radius: 11px; padding: 10px 14px; font-weight: 800; }
-    .primary { border: 1px solid var(--accent); background: var(--accent); color: white; }
-    .secondary { border: 1px solid var(--line); background: var(--surface-strong); color: #33445a; }
-    .danger { border: 1px solid #e2b4c0; background: #fff0f3; color: #8e2c45; }
-    .entries { display: grid; gap: 10px; margin-top: 18px; }
-    .entry { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: rgba(255,255,255,.65); }
-    .entry-head { display: flex; justify-content: space-between; gap: 14px; }
-    .entry small { color: var(--muted); }
-    .entry p { margin-bottom: 0; white-space: pre-wrap; }
-    .quality-table { width: 100%; border-collapse: collapse; }
-    .quality-table th, .quality-table td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    .quality-table th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
-    .ok { color: #176c55; font-weight: 800; }
-    .muted { color: var(--muted); }
-    footer { margin-top: 22px; color: var(--muted); font-size: .79rem; line-height: 1.5; }
-    @media (max-width: 840px) {
-      header { display: block; }
-      .badge { display: inline-block; margin-top: 16px; }
-      .metric { grid-column: span 6; }
-      .wide, .side { grid-column: 1 / -1; }
-    }
-    @media (max-width: 560px) {
-      .shell { width: min(100% - 18px, 1180px); padding-top: 18px; }
-      .metric { grid-column: 1 / -1; }
-      .form-grid { grid-template-columns: 1fr; }
-      .rec dl { grid-template-columns: 1fr; }
-      .rec dd { margin-bottom: 6px; }
-      .card { padding: 17px; border-radius: 16px; }
-    }
-    @media (prefers-color-scheme: dark) {
-      :root { color: #edf4fb; background: #0e1622; --surface: rgba(22,32,47,.94); --surface-strong: #192537; --line: #34445a; --muted: #aab7c7; --accent-soft: #133a3d; --high-soft: #452c19; --low-soft: #482230; --shadow: 0 18px 50px rgba(0,0,0,.28); }
-      body { background: radial-gradient(circle at top left, #143b3b 0, transparent 34rem), #0e1622; }
-      nav button { color: #cfdae8; }
-      nav button[aria-selected="true"] { background: #edf4fb; color: #172033; border-color: #edf4fb; }
-      input, textarea, select { border-color: #46576d; }
-      .entry { background: rgba(17,26,39,.65); }
-      .notice { color: #c1e7e4; border-color: #285f61; }
-      .secondary { color: #d7e2ee; }
-      .danger { background: #482230; border-color: #744052; color: #ffd8e3; }
-    }
-  </style>
+  <title>GlucoseCoach – lokale Verlaufsanalyse</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="shell">
@@ -125,95 +13,86 @@
       <div>
         <p class="eyebrow">Retrospektive Musteranalyse</p>
         <h1>GlucoseCoach</h1>
-        <p class="lead">Dieser MVP arbeitet mit dem realen, de-identifizierten Omnipod-/CGM-Export vom 7. Mai bis 4. August 2026. Er zeigt beobachtete Muster, leitet dokumentationsbezogene Handlungsschritte ab und erfindet keine Dosisempfehlungen.</p>
+        <p class="lead">Tagebucheinträge bleiben erhalten, neue Omnipod-/CGM-CSV-Dateien können wiederholt ergänzt werden, und alle lokalen Kennzahlen, Mahlzeitenzuordnungen und Beobachtungen werden anschließend neu berechnet.</p>
       </div>
-      <span class="badge">25.382 echte CGM-Werte</span>
+      <span id="header-badge" class="badge">25.382 echte CGM-Werte</span>
     </header>
 
     <nav aria-label="Bereiche">
       <button type="button" data-panel="overview" aria-selected="true">Überblick</button>
       <button type="button" data-panel="recommendations" aria-selected="false">Empfehlungen</button>
+      <button type="button" data-panel="meal-analysis" aria-selected="false">Mahlzeitenanalyse</button>
       <button type="button" data-panel="diary" aria-selected="false">Tagebuch</button>
+      <button type="button" data-panel="import-data" aria-selected="false">CSV-Daten</button>
       <button type="button" data-panel="quality" aria-selected="false">Datenqualität</button>
     </nav>
 
     <section id="overview" class="panel active">
-      <div class="grid">
-        <article class="card metric"><div class="label">Zeit im Zielbereich</div><div class="value">82,22&nbsp;%</div><div class="sub">70–180 mg/dl</div></article>
-        <article class="card metric"><div class="label">Mittlere Glukose</div><div class="value">138,5</div><div class="sub">mg/dl; technische Codes ausgeschlossen</div></article>
-        <article class="card metric"><div class="label">GMI-Schätzung</div><div class="value">6,62&nbsp;%</div><div class="sub">aus validen CGM-Werten</div></article>
-        <article class="card metric"><div class="label">Variationskoeffizient</div><div class="value">32,5&nbsp;%</div><div class="sub">CV</div></article>
-
+      <div class="source-row">
+        <span id="source-pill" class="source-pill">Veröffentlichter Ausgangsstand 07.05.–04.08.2026</span>
+        <div class="window-controls">
+          <label>Zeitraum
+            <select id="window-days" disabled>
+              <option value="7">letzte 7 Tage</option>
+              <option value="14">letzte 14 Tage</option>
+              <option value="30">letzte 30 Tage</option>
+              <option value="90" selected>letzte 90 Tage</option>
+              <option value="all">alle lokalen Daten</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="metrics" class="grid"></div>
+      <div class="grid" style="margin-top:16px">
         <article class="card wide">
-          <h2>Bereichszeiten über 90 Tage</h2>
-          <div class="rangebar" aria-label="1,23 Prozent unter 70; 82,22 Prozent zwischen 70 und 180; 16,55 Prozent über 180">
-            <span title="Unter 70 mg/dl: 1,23 %"></span><span title="70–180 mg/dl: 82,22 %"></span><span title="Über 180 mg/dl: 16,55 %"></span>
+          <h2 id="range-title">Bereichszeiten</h2>
+          <div class="rangebar" aria-label="Glukose-Bereichszeiten">
+            <span id="range-very-low" class="very-low"></span>
+            <span id="range-low" class="low"></span>
+            <span id="range-in" class="in-range"></span>
+            <span id="range-high" class="high"></span>
+            <span id="range-very-high" class="very-high"></span>
           </div>
-          <div class="legend">
-            <span><i style="background:#bd4b68"></i>&lt;70: 1,23 %</span>
-            <span><i style="background:#2d8b82"></i>70–180: 82,22 %</span>
-            <span><i style="background:#d67e32"></i>&gt;180: 16,55 %</span>
-          </div>
-          <p class="muted">Die Prozentwerte berücksichtigen die technischen HIGH-/LOW-Markierungen als außerhalb des Messbereichs. Für Mittelwert, GMI und CV werden diese Codes nicht als numerische Glukosewerte behandelt.</p>
+          <div id="range-legend" class="legend"></div>
+          <p id="range-note" class="muted"></p>
         </article>
-
         <aside class="card side">
-          <h2>Datensatz</h2>
-          <ul class="facts">
-            <li><span>Zeitraum</span><strong>07.05.–04.08.2026</strong></li>
-            <li><span>CGM-Abdeckung</span><strong>98,40 %</strong></li>
-            <li><span>CGM-Punkte</span><strong>25.382</strong></li>
-            <li><span>Bolusereignisse</span><strong>690</strong></li>
-            <li><span>Tage</span><strong>90</strong></li>
-            <li><span>Technische Marker</span><strong>30</strong></li>
-          </ul>
+          <h2>Datengrundlage</h2>
+          <ul id="dataset-facts" class="facts"></ul>
         </aside>
       </div>
     </section>
 
     <section id="recommendations" class="panel">
-      <div class="recommendations">
-        <div class="notice"><strong>Methodische Grenze:</strong> Die Empfehlungen beziehen sich auf beobachtete Muster und bessere Kontextdokumentation. Änderungen an Bolus, Basalrate, Faktoren oder Vorbolus-Zeitpunkt werden aus diesem Export nicht berechnet.</div>
+      <div class="notice"><strong>Automatisch neu berechnet:</strong> Die Karten berücksichtigen lokale CSV-Werte und die gespeicherten Tagebucheinträge. Sie beschreiben beobachtete Muster und Datenlücken, nicht Änderungen an Insulindosen oder Pumpeneinstellungen.</div>
+      <div id="recommendation-list" class="recommendations" style="margin-top:16px"></div>
+    </section>
 
-        <article class="card rec high">
-          <div class="rec-head"><div><h2>Frühstück gezielt protokollieren</h2><p class="muted">Wiederkehrendes postprandiales Hochmuster</p></div><span class="rec-tag">Hohe Priorität</span></div>
-          <dl>
-            <dt>Befund</dt><dd>Isoliert auswertbare Frühstücksereignisse erreichen im Median 202 mg/dl; der Peak liegt ungefähr 95 Minuten nach dem Kohlenhydrateintrag.</dd>
-            <dt>Handlung</dt><dd>Für zwei Wochen Frühstücksbestandteile, Gramm Kohlenhydrate, Fett, Eiweiß, Ballaststoffe, Essensbeginn sowie Bewegung in den folgenden zwei Stunden eintragen. Danach gleiche oder ähnliche Frühstücke vergleichen.</dd>
-            <dt>Ziel</dt><dd>Unterscheiden, ob das Muster vor allem bei bestimmten Lebensmitteln oder Zusammensetzungen auftritt, statt pauschal „Frühstück“ als Ursache anzunehmen.</dd>
-            <dt>Grenze</dt><dd>Aus Peak-Höhe und Peak-Zeit allein folgt keine belastbare Änderung eines Insulinfaktors oder Vorbolus-Zeitpunkts.</dd>
-          </dl>
+    <section id="meal-analysis" class="panel">
+      <div class="grid">
+        <article class="card full">
+          <h2>Mahlzeiten mit CGM und Bolusereignissen verknüpfen</h2>
+          <p class="muted">Für jeden Tagebucheintrag werden CGM-Werte von 15 Minuten davor bis 180 Minuten danach gesucht. Als Kurvenmerkmale zeigt die App Ausgangswert, ersten nachhaltigen Anstieg, Peak und Zwei-Stunden-Wert. Ein nach einem passenden Bolus beobachteter Kurvenwendepunkt wird ausdrücklich nur als CGM-Proxy bezeichnet, nicht als pharmakologischer Wirkeintritt.</p>
+          <div id="meal-summary" class="analysis-grid"></div>
         </article>
-
-        <article class="card rec high">
-          <div class="rec-head"><div><h2>Abendliche Hochphasen aufklären</h2><p class="muted">Zeitfenster um etwa 21 Uhr</p></div><span class="rec-tag">Prüfen</span></div>
-          <dl>
-            <dt>Befund</dt><dd>Um 21 Uhr liegt der Anteil der Messwerte über 180 mg/dl deutlich über dem Gesamtprofil.</dd>
-            <dt>Handlung</dt><dd>Späte Mahlzeiten und Snacks, Getränke, Essensende, Bewegung, Krankheit, Stress und gegebenenfalls noch aktives Insulin als Kontext dokumentieren.</dd>
-            <dt>Ziel</dt><dd>Trennen, ob die Hochphase an einzelnen Tagen, an bestimmten Mahlzeiten oder unabhängig von dokumentierten Kohlenhydraten auftritt.</dd>
-            <dt>Grenze</dt><dd>Der Export erlaubt ohne vollständigen Kontext keine kausale Zuordnung und keine automatische Korrekturempfehlung.</dd>
-          </dl>
+        <article class="card full">
+          <h2>Einzelne Einträge</h2>
+          <div id="meal-events" class="analysis-list"></div>
         </article>
-
-        <article class="card rec low">
-          <div class="rec-head"><div><h2>18–20 Uhr als Niedrig-Zeitfenster markieren</h2><p class="muted">Relativ häufiger unter 70 mg/dl</p></div><span class="rec-tag">Sicherheit</span></div>
-          <dl>
-            <dt>Befund</dt><dd>Zwischen 18 und 20 Uhr treten im Verhältnis zum Gesamtprofil häufiger Werte unter 70 mg/dl auf.</dd>
-            <dt>Handlung</dt><dd>Bei künftigen Ereignissen Sport, Schritte, körperliche Arbeit, vorausgehende Mahlzeit, Zeit seit dem letzten Bolus und Symptome protokollieren. Wiederkehrende Episoden mit dem behandelnden Diabetesteam anhand der Originaldaten besprechen.</dd>
-            <dt>Ziel</dt><dd>Aktivitätsbezogene und mahlzeitenbezogene Konstellationen erkennen, ohne alle Ereignisse als gleichartig zu behandeln.</dd>
-            <dt>Grenze</dt><dd>Die App ersetzt weder CGM-/Pumpenalarm noch den individuell vereinbarten Hypoglykämieplan und gibt keine Akutanweisung.</dd>
-          </dl>
+        <article class="card wide">
+          <h2>Vergleich gleicher Lebensmittel</h2>
+          <div class="table-wrap">
+            <table class="quality-table">
+              <thead><tr><th>Lebensmittel / Mahlzeit</th><th>Einträge</th><th>auswertbar</th><th>Peak-Anstieg</th><th>Zeit bis Peak</th><th>2-h-Änderung</th></tr></thead>
+              <tbody id="food-comparison"></tbody>
+            </table>
+          </div>
+          <p id="food-comparison-note" class="muted compact"></p>
         </article>
-
-        <article class="card rec">
-          <div class="rec-head"><div><h2>Fehlende Einflussgrößen systematisch ergänzen</h2><p class="muted">Voraussetzung für individuellere Analysen</p></div><span class="rec-tag">Datengrundlage</span></div>
-          <dl>
-            <dt>Befund</dt><dd>Der Pumpenexport enthält Kohlenhydratmengen und Insulinereignisse, aber keine verlässlichen Angaben zu konkreten Lebensmitteln, Makronährstoffen, Sport, Schritten, Schlaf, Krankheit oder Stress.</dd>
-            <dt>Handlung</dt><dd>Das lokale Tagebuch zunächst für die drei auffälligen Zeitfenster verwenden. Wenige vollständig dokumentierte Vergleichssituationen sind analytisch wertvoller als viele lückenhafte Einträge.</dd>
-            <dt>Ziel</dt><dd>Spätere Empfehlungen auf wiederholte, vergleichbare Situationen stützen.</dd>
-            <dt>Grenze</dt><dd>Auch vollständigere Beobachtungsdaten beweisen nicht automatisch Ursache und Wirkung.</dd>
-          </dl>
-        </article>
+        <aside class="card side">
+          <h2>Krankheit als Kontext</h2>
+          <div id="illness-comparison"></div>
+        </aside>
       </div>
     </section>
 
@@ -221,12 +100,12 @@
       <div class="grid">
         <article class="card wide">
           <h2>Kontext erfassen</h2>
-          <p class="muted">Alle Einträge bleiben ausschließlich im lokalen Browser-Speicher. Es erfolgt keine Übertragung.</p>
+          <p class="muted">Bestehende Einträge aus der bisherigen Version werden unter demselben lokalen Speicherschlüssel weiterverwendet. Es erfolgt keine Übertragung.</p>
           <form id="diary-form">
             <div class="form-grid">
               <label>Zeitpunkt<input id="when" type="datetime-local" required></label>
               <label>Anlass<select id="occasion"><option>Frühstück</option><option>Mittagessen</option><option>Abendessen</option><option>Snack</option><option>Sport</option><option>Unterzuckerung</option><option>Sonstiges</option></select></label>
-              <label class="full">Lebensmittel / Mahlzeit<input id="food" type="text" placeholder="z. B. Haferflocken, Milch, Apfel"></label>
+              <label class="full-field">Lebensmittel / Mahlzeit<input id="food" type="text" placeholder="z. B. Haferflocken, Milch, Apfel"></label>
               <label>Kohlenhydrate (g)<input id="carbs" type="number" min="0" step="0.1"></label>
               <label>Fett (g)<input id="fat" type="number" min="0" step="0.1"></label>
               <label>Eiweiß (g)<input id="protein" type="number" min="0" step="0.1"></label>
@@ -235,100 +114,75 @@
               <label>Schlaf (Stunden)<input id="sleep" type="number" min="0" max="24" step="0.25"></label>
               <label>Stress (0–10)<input id="stress" type="number" min="0" max="10" step="1"></label>
               <label>Krankheit<select id="illness"><option value="nein">Nein</option><option value="ja">Ja</option></select></label>
-              <label class="full">Notizen<textarea id="notes" placeholder="Symptome, Besonderheiten, Essensbeginn/-ende …"></textarea></label>
+              <label class="full-field">Notizen<textarea id="notes" placeholder="Symptome, Besonderheiten, Essensbeginn/-ende …"></textarea></label>
             </div>
-            <div class="actions"><button class="primary" type="submit">Eintrag speichern</button><button class="secondary" type="button" id="export">JSON exportieren</button><label class="secondary" style="display:inline-flex;align-items:center;cursor:pointer">JSON importieren<input id="import" type="file" accept="application/json" hidden></label><button class="danger" type="button" id="clear">Alle lokalen Einträge löschen</button></div>
+            <div class="actions">
+              <button class="primary" type="submit">Eintrag speichern und neu berechnen</button>
+              <button class="secondary" type="button" id="export-diary">Tagebuch-JSON exportieren</button>
+              <label class="file-button">Tagebuch-JSON importieren<input id="import-diary" type="file" accept="application/json" hidden></label>
+              <button class="danger" type="button" id="clear-diary">Alle Tagebucheinträge löschen</button>
+            </div>
           </form>
         </article>
         <aside class="card side">
           <h2>Einträge</h2>
-          <p id="empty" class="muted">Noch keine lokalen Einträge.</p>
+          <p id="empty-diary" class="muted">Noch keine lokalen Einträge.</p>
           <div id="entries" class="entries"></div>
         </aside>
+      </div>
+    </section>
+
+    <section id="import-data" class="panel">
+      <div class="grid">
+        <article class="card wide">
+          <h2>Aktuelle Omnipod-/CGM-CSV ergänzen</h2>
+          <div class="import-drop">
+            <p><strong>Mehrere Dateien gleichzeitig auswählen:</strong> insbesondere <code>cgm_data_*.csv</code> und <code>bolus_data_*.csv</code>. Metadatenzeilen und nicht benötigte Spalten werden verworfen.</p>
+            <p class="muted">Bereits vorhandene Zeitpunkte werden dedupliziert. Dadurch lassen sich überlappende Exporte und spätere Zeiträume wiederholt hinzufügen.</p>
+            <div class="actions">
+              <label class="file-button">CSV-Dateien auswählen<input id="csv-files" type="file" accept=".csv,text/csv" multiple hidden></label>
+              <button id="import-csv" class="primary" type="button">Ausgewählte CSV lokal importieren</button>
+            </div>
+            <div id="selected-files" class="muted compact">Keine Dateien ausgewählt.</div>
+            <div id="import-progress" class="progress" role="status" aria-live="polite"></div>
+          </div>
+          <div id="import-summary" class="import-summary"></div>
+        </article>
+        <aside class="card side">
+          <h2>Lokaler Datenbestand</h2>
+          <ul id="local-data-facts" class="facts"></ul>
+          <div class="actions" style="margin-top:18px">
+            <button class="secondary" type="button" id="export-all">Gesamtsicherung exportieren</button>
+            <label class="file-button">Gesamtsicherung importieren<input id="import-all" type="file" accept="application/json" hidden></label>
+            <button class="danger" type="button" id="clear-clinical">Nur lokale CSV-Daten löschen</button>
+          </div>
+        </aside>
+        <article class="card full">
+          <h2>Was nach dem Import passiert</h2>
+          <p>Die App berechnet Bereichszeiten, Mittelwert, GMI-Schätzung, Variabilität, zeitliche Hoch-/Niedrigmuster sowie die Zuordnung zu Tagebucheinträgen vollständig im Browser neu. Die Rohdateien werden weder hochgeladen noch als Datei gespeichert; lokal verbleiben nur die benötigten de-identifizierten Mess- und Ereignisfelder.</p>
+        </article>
       </div>
     </section>
 
     <section id="quality" class="panel">
       <article class="card">
         <h2>Datenqualität und Verarbeitung</h2>
-        <table class="quality-table">
-          <thead><tr><th>Prüfung</th><th>Ergebnis</th><th>Behandlung</th></tr></thead>
-          <tbody>
-            <tr><td>CGM-Abdeckung</td><td class="ok">98,40 %</td><td>Hohe zeitliche Abdeckung im 90-Tage-Zeitraum.</td></tr>
-            <tr><td>HIGH-Code 2001</td><td>29 Vorkommen</td><td>Als oberhalb des Exportbereichs gewertet; nicht als 2001 mg/dl in Mittelwert, GMI oder CV.</td></tr>
-            <tr><td>LOW-Code 1</td><td>1 Vorkommen</td><td>Als unterhalb des Exportbereichs gewertet; nicht als 1 mg/dl in Mittelwert, GMI oder CV.</td></tr>
-            <tr><td>Direkte Identifikatoren</td><td class="ok">Entfernt</td><td>Keine Mailheader, E-Mail-Adressen, Namen, Originaldateien oder Gerätekennung in dieser Oberfläche.</td></tr>
-            <tr><td>Kontextvariablen</td><td>Unvollständig</td><td>Lebensmittel, Makronährstoffe, Bewegung, Schlaf, Krankheit und Stress müssen künftig separat dokumentiert werden.</td></tr>
-          </tbody>
-        </table>
-        <p class="muted">Die Werte dieser Seite stammen aus der bereinigten Analyse des realen Exports. Die Oberfläche enthält weder synthetische Beispielpatienten noch erfundene Tagesverläufe.</p>
+        <div class="table-wrap">
+          <table class="quality-table">
+            <thead><tr><th>Prüfung</th><th>Ergebnis</th><th>Behandlung</th></tr></thead>
+            <tbody id="quality-body"></tbody>
+          </table>
+        </div>
+        <p id="quality-note" class="muted"></p>
       </article>
     </section>
 
     <footer>Nur retrospektive Entscheidungsunterstützung. Keine Diagnose, keine automatische Insulindosierung und kein Ersatz für Pumpen-/CGM-Alarme oder den individuell vereinbarten Behandlungsplan.</footer>
   </main>
 
-  <script>
-    const STORAGE_KEY = 'glucosecoach-diary-v1';
-    const navButtons = [...document.querySelectorAll('nav button')];
-    const panels = [...document.querySelectorAll('.panel')];
-    navButtons.forEach(button => button.addEventListener('click', () => {
-      navButtons.forEach(item => item.setAttribute('aria-selected', String(item === button)));
-      panels.forEach(panel => panel.classList.toggle('active', panel.id === button.dataset.panel));
-    }));
-
-    const form = document.querySelector('#diary-form');
-    const entriesNode = document.querySelector('#entries');
-    const emptyNode = document.querySelector('#empty');
-    const whenInput = document.querySelector('#when');
-    whenInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-
-    function loadEntries() {
-      try {
-        const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        return Array.isArray(value) ? value : [];
-      } catch { return []; }
-    }
-    function saveEntries(entries) { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
-    function esc(value) { return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
-    function render() {
-      const entries = loadEntries().sort((a, b) => b.when.localeCompare(a.when));
-      emptyNode.hidden = entries.length > 0;
-      entriesNode.innerHTML = entries.map(entry => {
-        const macros = [entry.carbs && `${entry.carbs} g KH`, entry.fat && `${entry.fat} g Fett`, entry.protein && `${entry.protein} g Eiweiß`, entry.fiber && `${entry.fiber} g Ballaststoffe`].filter(Boolean).join(' · ');
-        const context = [entry.activity, entry.sleep && `${entry.sleep} h Schlaf`, entry.stress !== '' && `Stress ${entry.stress}/10`, entry.illness === 'ja' && 'Krankheit'].filter(Boolean).join(' · ');
-        return `<article class="entry"><div class="entry-head"><strong>${esc(entry.occasion)}</strong><small>${esc(new Date(entry.when).toLocaleString('de-DE'))}</small></div>${entry.food ? `<p>${esc(entry.food)}</p>` : ''}${macros ? `<small>${esc(macros)}</small>` : ''}${context ? `<p><small>${esc(context)}</small></p>` : ''}${entry.notes ? `<p>${esc(entry.notes)}</p>` : ''}<button type="button" class="secondary remove" data-id="${esc(entry.id)}">Löschen</button></article>`;
-      }).join('');
-      document.querySelectorAll('.remove').forEach(button => button.addEventListener('click', () => {
-        saveEntries(loadEntries().filter(entry => entry.id !== button.dataset.id));
-        render();
-      }));
-    }
-
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      const get = id => document.querySelector(`#${id}`).value;
-      const entry = { id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, when: get('when'), occasion: get('occasion'), food: get('food').trim(), carbs: get('carbs'), fat: get('fat'), protein: get('protein'), fiber: get('fiber'), activity: get('activity').trim(), sleep: get('sleep'), stress: get('stress'), illness: get('illness'), notes: get('notes').trim() };
-      const entries = loadEntries(); entries.push(entry); saveEntries(entries);
-      form.reset();
-      whenInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      render();
-    });
-
-    document.querySelector('#export').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify({schema:'glucosecoach-diary-v1', exportedAt:new Date().toISOString(), entries:loadEntries()}, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `glucosecoach-tagebuch-${new Date().toISOString().slice(0,10)}.json`; anchor.click(); URL.revokeObjectURL(url);
-    });
-    document.querySelector('#import').addEventListener('change', async event => {
-      const file = event.target.files?.[0]; if (!file) return;
-      try { const parsed = JSON.parse(await file.text()); const entries = Array.isArray(parsed) ? parsed : parsed.entries; if (!Array.isArray(entries)) throw new Error('Ungültiges Format'); saveEntries(entries); render(); }
-      catch (error) { alert(`Import fehlgeschlagen: ${error.message}`); }
-      event.target.value = '';
-    });
-    document.querySelector('#clear').addEventListener('click', () => {
-      if (confirm('Alle lokalen Tagebucheinträge unwiderruflich löschen?')) { localStorage.removeItem(STORAGE_KEY); render(); }
-    });
-    render();
-  </script>
+  <script src="app-core.js"></script>
+  <script src="app-analysis.js"></script>
+  <script src="app-render.js"></script>
+  <script src="app-events.js"></script>
 </body>
 </html>

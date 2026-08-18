@@ -17,54 +17,64 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify self-contained Sites build
+      - name: Verify modular Sites build
         shell: bash
         run: |
           set -euo pipefail
-          test -s docs/index.html
+          for file in docs/index.html docs/styles.css docs/app-core.js docs/app-analysis.js docs/app-render.js docs/app-events.js; do
+            test -s "$file"
+          done
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('docs/index.html')
-          text = path.read_text(encoding='utf-8')
+          paths = [
+              Path('docs/index.html'),
+              Path('docs/styles.css'),
+              Path('docs/app-core.js'),
+              Path('docs/app-analysis.js'),
+              Path('docs/app-render.js'),
+              Path('docs/app-events.js'),
+          ]
+          text = '\n'.join(path.read_text(encoding='utf-8') for path in paths)
           required = [
               '25.382 echte CGM-Werte',
-              '82,22&nbsp;%',
-              '138,5',
-              '6,62&nbsp;%',
-              '32,5&nbsp;%',
+              '82.22',
+              '138.5',
+              '6.62',
+              '32.5',
               'Frühstück gezielt protokollieren',
-              'Abendliche Hochphasen aufklären',
+              'Abendliche Hochphasen',
               '18–20 Uhr als Niedrig-Zeitfenster markieren',
-              "localStorage",
+              'localStorage',
+              'glucosecoach-clinical-v1',
+              'parseClinicalCsv',
+              'Mahlzeitenanalyse',
           ]
           missing = [value for value in required if value not in text]
           if missing:
-              raise SystemExit(f'Missing required real-data content: {missing}')
+              raise SystemExit(f'Missing required real-data/Sites content: {missing}')
 
           forbidden = [
-              'stephanmenze@gmx.de',
-              'stephanmenze@icloud.com',
+              'stephanmenze' + '@' + 'gmx.de',
+              'stephanmenze' + '@' + 'icloud.com',
               'Daten - (stephanmenze',
+              'Banane, Himbeeren, Haferpops, Milch',
+              'Konnte nicht in Steuergerät eingegeben werden',
               '.eml',
           ]
           leaks = [value for value in forbidden if value.lower() in text.lower()]
           if leaks:
-              raise SystemExit(f'Direct identifier/source leak in Sites build: {leaks}')
+              raise SystemExit(f'Direct identifier/private entry leak in Sites build: {leaks}')
           print('Sites build verified')
           PY
-      - name: Run repository validator when present
+      - name: Run repository validator
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f scripts/validate_project.py ]]; then
-            python scripts/validate_project.py
-          fi
-      - name: Run unit tests when present
+          python scripts/validate_project.py
+      - name: Run unit and browser-logic tests
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -d tests ]]; then
-            pip install -r requirements.txt
-            python -m unittest discover -s tests -p 'test_*.py'
-          fi
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -p 'test_*.py'
