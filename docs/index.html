@@ -22,6 +22,7 @@
       <button type="button" data-panel="overview" aria-selected="true">Überblick</button>
       <button type="button" data-panel="recommendations" aria-selected="false">Empfehlungen</button>
       <button type="button" data-panel="meal-analysis" aria-selected="false">Mahlzeitenanalyse</button>
+      <button type="button" data-panel="insulin-action" aria-selected="false">Insulinwirkung</button>
       <button type="button" data-panel="diary" aria-selected="false">Tagebuch</button>
       <button type="button" data-panel="import-data" aria-selected="false">CSV-Daten</button>
       <button type="button" data-panel="quality" aria-selected="false">Datenqualität</button>
@@ -73,7 +74,7 @@
       <div class="grid">
         <article class="card full">
           <h2>Mahlzeiten mit CGM und Bolusereignissen verknüpfen</h2>
-          <p class="muted">Für Tagebucheinträge werden CGM-Werte von 15 Minuten davor bis 180 Minuten danach gesucht. Angezeigt werden Ausgangswert, erster nachhaltiger Anstieg, Peak und Zwei-Stunden-Wert. Ein nach einem passenden Bolus beobachteter Kurvenwendepunkt ist nur ein retrospektiver CGM-Proxy und kein direkter pharmakologischer Wirkeintritt.</p>
+          <p class="muted">Der 2-h-Peak wird ab dem protokollierten Essensbeginn bestimmt. Ein anhaltender Rückgang wird nur als retrospektiver CGM-Kurvenproxy ausgewiesen und nicht als direkter pharmakologischer Wirkbeginn interpretiert.</p>
           <div id="meal-summary" class="analysis-grid"></div>
         </article>
         <article class="card full">
@@ -94,6 +95,62 @@
           <h2>Krankheit als Kontext</h2>
           <div id="illness-comparison"></div>
         </aside>
+      </div>
+    </section>
+
+    <section id="insulin-action" class="panel">
+      <div class="grid">
+        <article class="card full">
+          <h2>Geschätzte effektive Glukosesenkungswirkung von Bolusinsulin</h2>
+          <div class="notice warn"><strong>Modellschätzung, keine pharmakologische Messung:</strong> Die CGM-Kurve zeigt das Nettoergebnis aus Insulin, Nahrung, Basalabgabe, Aktivität, Krankheit, Gegenregulation und Messverzögerung. Für die persönliche Wirkungskurve werden nur streng isolierte Korrekturereignisse verwendet. Mahlzeitenboli bleiben als beobachtete Verläufe sichtbar, fließen aber nicht in die Wirkzeitschätzung ein.</div>
+          <div id="insulin-summary" class="analysis-grid insulin-summary"></div>
+          <p id="insulin-method-note" class="muted compact"></p>
+        </article>
+
+        <article class="card wide">
+          <h2>Persönliche Wirkungsschätzung</h2>
+          <div id="insulin-aggregate"></div>
+        </article>
+        <aside class="card side">
+          <h2>Verwendete Qualitätsregeln</h2>
+          <ul class="facts">
+            <li><span>Analysefenster</span><strong>bis 5 Stunden</strong></li>
+            <li><span>Mindestabdeckung</span><strong>80 % CGM</strong></li>
+            <li><span>weitere Boli</span><strong>Ausschluss</strong></li>
+            <li><span>Nahrung/Sport/Krankheit</span><strong>Ausschluss oder Kennzeichnung</strong></li>
+            <li><span>Pumpen-/Basalstörung</span><strong>Ausschluss</strong></li>
+            <li><span>Mindestzahl aggregiert</span><strong>3 Ereignisse</strong></li>
+          </ul>
+        </aside>
+
+        <article class="card wide">
+          <h2>Normierte persönliche Wirkungskurve</h2>
+          <p class="muted compact">Je Ereignis wird die größte trendbereinigte Glukoseabweichung auf 100 % normiert. Die Tabelle zeigt den Median und die mittleren 50 % der streng isolierten Ereignisse. Sie ist keine Insulin-on-Board-Kurve.</p>
+          <div class="table-wrap">
+            <table class="quality-table">
+              <thead><tr><th>Zeit nach Bolus</th><th>Ereignisse</th><th>Median der normierten Wirkung</th><th>mittlere 50 %</th></tr></thead>
+              <tbody id="insulin-profile"></tbody>
+            </table>
+          </div>
+          <p id="insulin-profile-empty" class="muted">Noch keine ausreichend auswertbaren Korrekturereignisse.</p>
+        </article>
+        <aside class="card side">
+          <h2>Stratifizierte Schätzungen</h2>
+          <p class="muted compact">Gruppen werden erst ab zwei auswertbaren Ereignissen angezeigt. Kleine Gruppen sind explorativ.</p>
+          <div class="table-wrap">
+            <table class="quality-table insulin-group-table">
+              <thead><tr><th>Gruppe</th><th>n</th><th>Beginn</th><th>Maximum</th><th>Restwirkung unter Schwelle</th></tr></thead>
+              <tbody id="insulin-groups"></tbody>
+            </table>
+          </div>
+          <p id="insulin-groups-empty" class="muted">Noch keine Gruppen mit mindestens zwei Ereignissen.</p>
+        </aside>
+
+        <article class="card full">
+          <h2>Beobachtete Reaktion je Bolus</h2>
+          <p class="muted">„Erste stabile Phase“ beschreibt nur eine flachere CGM-Phase nach dem Nadir. Sie bedeutet nicht, dass das Insulin nicht mehr wirkt. Ausschlussgründe erklären, warum ein Ereignis nicht in die persönliche Wirkzeitschätzung eingeht.</p>
+          <div id="insulin-events" class="analysis-list"></div>
+        </article>
       </div>
     </section>
 
@@ -160,7 +217,7 @@
         </aside>
         <article class="card full">
           <h2>Speichermodell</h2>
-          <p>Die öffentliche Seite enthält keinen Patientendatensatz. Jeder Browser besitzt seinen eigenen lokalen Datenbestand. Alle Kennzahlen, Zeitmuster, Mahlzeitenvergleiche und Empfehlungen werden ausschließlich aus diesem Bestand erzeugt.</p>
+          <p>Die öffentliche Seite enthält keinen Patientendatensatz. Jeder Browser besitzt seinen eigenen lokalen Datenbestand. Alle Kennzahlen, Zeitmuster, Mahlzeitenvergleiche, Wirkungsschätzungen und Empfehlungen werden ausschließlich aus diesem Bestand erzeugt.</p>
         </article>
       </div>
     </section>
