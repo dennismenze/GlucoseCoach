@@ -6,10 +6,14 @@ Diese Datei enthält verbindliche Arbeitsregeln für Coding-Agenten, die an Gluc
 
 Eine Änderung gilt **nicht** als verifiziert, nur weil der Code plausibel aussieht, lokal syntaktisch korrekt ist oder Unit-Tests gedanklich bzw. außerhalb der CI bestanden haben. Für Änderungen an Browserlogik, Importern, Darstellung, Berechnungen oder E2E-Tests muss das Feedback der **tatsächlichen GitHub-Actions-Läufe** gelesen und abgearbeitet werden.
 
+## Ein Arbeitsstrang, ein PR
+
+Für dieselbe fachliche Aufgabe darf nicht bei jedem Fehler ein neuer Branch oder Pull Request erzeugt werden. Existiert bereits ein offener Arbeits-PR, wird **dieser** aktualisiert und als einzige Quelle der Wahrheit verwendet. Überholte PRs werden geschlossen. Temporäre Trigger-, Merge- oder Finalisierungs-Workflows dürfen nicht dauerhaft im Feature-PR verbleiben.
+
 ## Verbindlicher CI-/Debug-Workflow
 
 1. Änderung auf einem separaten Branch vornehmen.
-2. Einen Pull Request gegen `main` öffnen oder aktualisieren.
+2. Einen Pull Request gegen `main` öffnen oder einen bereits vorhandenen PR derselben Aufgabe aktualisieren.
 3. Die GitHub-Actions-Läufe des PR-Head-Commits abwarten.
 4. Für jeden fehlgeschlagenen Workflow die Jobs und anschließend die vollständigen Job-Logs lesen.
 5. Den **ersten konkreten Fehler** beheben. Nicht spekulativ mehrere unabhängige Änderungen auf einmal vornehmen.
@@ -29,8 +33,7 @@ Der verwendete GitHub-Connector kann Push-Workflow-Runs auf `main` nicht immer z
 
 Darum gilt für Agenten mit dieser Einschränkung:
 
-- einen temporären Debug-/Feature-Branch erstellen;
-- PR gegen `main` öffnen;
+- den bestehenden Feature-/Debug-PR wiederverwenden;
 - den PR-Head-SHA mit `fetch_commit_workflow_runs` prüfen;
 - mit `fetch_workflow_run_jobs` den fehlgeschlagenen Job bestimmen;
 - mit `fetch_workflow_job_logs` die konkrete Fehlermeldung lesen;
@@ -65,6 +68,22 @@ Für `Insulinwirkung` gilt zusätzlich:
 - zensierte Ereignisse und Unsicherheitsangaben dürfen nicht stillschweigend entfernt werden.
 
 Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constraints wie `step`, `min` und `max` einzuhalten und CSV-Felder mit Trennzeichen korrekt zu quoten. Ein Test soll nicht wegen absichtlich oder versehentlich ungültiger Fixture-Daten fehlschlagen, außer genau diese Validierung wird getestet.
+
+## Verbindlicher Mahlzeiten-Peak-Vertrag
+
+Der Mahlzeiten-Peak ist **nicht** auf 120 Minuten begrenzt. Fett- und proteinreiche Mahlzeiten können einen deutlich späteren Glukoseanstieg zeigen; deshalb gilt für die Implementierung:
+
+- der Mahlzeitenkontext reicht bis zu 300 Minuten nach dem protokollierten Essensbeginn, endet aber früher bei einer neuen protokollierten Mahlzeit;
+- zuerst wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
+- bei mehreren positiven Boli innerhalb des Mahlzeitenkontexts wird die Rückgangssuche nach dem **letzten** Bolus neu gestartet;
+- der maßgebliche Peak ist der höchste CGM-Wert zwischen diesem letzten positiven Bolus und dem anschließend stabil bestätigten Rückgang;
+- ein früherer, auch höherer Peak vor einem späteren Bolus gehört nicht mehr zum maßgeblichen letzten Bolussegment;
+- der 2-h-Wert bleibt als separater Referenzwert erhalten, ist aber nicht mehr die Peak-Grenze;
+- ohne positiven Bolus oder ohne stabil bestätigten Rückgang darf kein endgültiger bolusbezogener Mahlzeiten-Peak behauptet werden;
+- eine weitere protokollierte Mahlzeit beendet die Zuordnung und kann die vorherige Analyse unvollständig machen;
+- die UI muss Zeitabstände sowohl relativ zum Essen als auch relativ zum maßgeblichen letzten Bolus eindeutig benennen.
+
+Die Hysterese darf nicht durch einen einzelnen gleichen oder niedrigeren CGM-Wert ausgelöst werden. Der aktuelle Vertrag verlangt vier zusammenhängende Folgewerte über rund 20 Minuten, mindestens 8 mg/dl bestätigten Abfall und verwirft einen Kandidaten bei einem späteren Rebound von mehr als 3 mg/dl im verbleibenden Kontext.
 
 ## Medizinisch-methodische Grenzen
 
