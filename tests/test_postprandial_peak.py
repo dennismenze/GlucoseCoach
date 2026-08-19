@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PostprandialPeakTests(unittest.TestCase):
-    def test_peak_is_limited_to_first_120_minutes(self) -> None:
+    def test_peak_follows_last_bolus_until_sustained_decline(self) -> None:
         result = subprocess.run(
             ["node", str(ROOT / "tests" / "postprandial_peak_test.cjs")],
             capture_output=True,
@@ -17,7 +17,7 @@ class PostprandialPeakTests(unittest.TestCase):
         )
         if result.returncode != 0:
             self.fail(
-                "Two-hour peak Node contract failed.\n"
+                "Adaptive meal-peak Node contract failed.\n"
                 f"STDOUT:\n{result.stdout}\n"
                 f"STDERR:\n{result.stderr}"
             )

@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js docs/app-meal-window.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js docs/app-meal-window.js docs/app-insulin-action.js; do
             test -s "$file"
           done
           python - <<'PY'
@@ -40,6 +40,7 @@ jobs:
               "docs/app-importers-context.js",
               "docs/app-ui-contract.js",
               "docs/app-meal-window.js",
+              "docs/app-insulin-action.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
@@ -50,12 +51,14 @@ jobs:
               "glucosecoach-clinical-v1",
               "parseClinicalCsv",
               "Mahlzeitenanalyse",
+              "Insulinwirkung",
               "localStorage",
               "app-v3-core.js",
               "app-importers.js",
               "app-importers-context.js",
               "app-ui-contract.js",
               "app-meal-window.js",
+              "app-insulin-action.js",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
@@ -67,8 +70,20 @@ jobs:
               "medication_data_",
               "notes_data_",
               "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
-              "GC_POSTPRANDIAL_PEAK_MINUTES",
-              "CGM-Wert in den ersten 120 Minuten",
+              "GC_TWO_HOUR_REFERENCE_MINUTES",
+              "GC_MEAL_CONTEXT_MINUTES",
+              "GC_DECLINE_CONFIRMATION_MINUTES",
+              "GC_DECLINE_DROP_MGDL",
+              "nicht mehr auf zwei Stunden begrenzt",
+              "letzten positiven Bolus",
+              "Peak-Start neu",
+              "2-h-Wert bleibt nur ein Referenzwert",
+              "pharmakologischen Insulin-Wirkbeginns",
+              "analyzeInsulinAction",
+              "ACTION_WINDOW_MINUTES = 300",
+              "MIN_CGM_COVERAGE = 0.80",
+              "END_REMAINING_FRACTION = 0.10",
+              "keine Empfehlung zur Änderung von Pumpenparametern",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
@@ -81,18 +96,25 @@ jobs:
               raise SystemExit(f"Missing personal-local site contract: {missing}")
           if leaks:
               raise SystemExit(f"Published patient baseline leaked into site: {leaks}")
-          print("Personal-local site verified")
+          print("Personal-local meal and insulin-action site verified")
           PY
 
-      - name: Syntax-check E2E suite
+      - name: Syntax-check browser and E2E modules
         shell: bash
         run: |
           set -euo pipefail
           node --check docs/app-meal-window.js
+          node --check docs/app-insulin-action.js
+          node --check tests/sites_logic_test.cjs
           node --check tests/postprandial_peak_test.cjs
+          node --check tests/insulin_action_test.cjs
           node --check e2e/oracle.cjs
+          node --check e2e/oracle-two-hour-patch.cjs
+          node --check e2e/insulin-action-oracle.cjs
           node --check e2e/glucosecoach.e2e.spec.cjs
           node --check e2e/postprandial-peak.e2e.spec.cjs
+          node --check e2e/insulin-action.e2e.spec.cjs
+          node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
 
       - name: Run repository validator

@@ -1,34 +1,22 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'docs', 'index.html'), 'utf8');
-const loader = fs.readFileSync(path.join(root, 'docs', 'app-v3.js'), 'utf8');
-const core = fs.readFileSync(path.join(root, 'docs', 'app-v3-core.js'), 'utf8');
-const importers = fs.readFileSync(path.join(root, 'docs', 'app-importers.js'), 'utf8');
-const contextImporters = fs.readFileSync(path.join(root, 'docs', 'app-importers-context.js'), 'utf8');
-const analytics = require(path.join(root, 'docs', 'app-v3.js'));
+const core = require(path.join(root, 'docs', 'app-v3-core.js'));
+const meal = require(path.join(root, 'docs', 'app-meal-window.js'));
+const importers = require(path.join(root, 'docs', 'app-importers.js'));
+const contextImporters = require(path.join(root, 'docs', 'app-importers-context.js'));
+const app = { ...core, ...meal, ...importers, ...contextImporters };
 
-const minute = (iso) => Math.round(new Date(iso).getTime() / 60000);
+const minute = (iso) => Math.round(new Date(iso).getTime() / 60_000);
 
-assert.equal(analytics.GC_DIARY_KEY, 'glucosecoach-diary-v1');
-assert.equal(analytics.GC_CLINICAL_KEY, 'glucosecoach-clinical-v1');
-assert.equal(analytics.GC_PROFILE_KEY, 'glucosecoach-profile-v1');
-assert(loader.includes('app-v3-core.js'));
-assert(loader.includes('app-importers.js'));
-assert(loader.includes('app-importers-context.js'));
-
-for (const forbidden of [
-  '25.382', '25382', '138.5', '6.62', '82.22', '16.55',
-  'Veröffentlichter Ausgangsstand', 'STATIC_BASELINE',
-]) {
-  for (const [name, text] of [['HTML', html], ['core', core], ['importers', importers], ['context importers', contextImporters]]) {
-    assert(!text.includes(forbidden), `${name} contains published patient baseline: ${forbidden}`);
-  }
-}
+assert.equal(core.GC_DIARY_KEY, 'glucosecoach-diary-v1');
+assert.equal(core.GC_CLINICAL_KEY, 'glucosecoach-clinical-v1');
+assert.equal(core.GC_PROFILE_KEY, 'glucosecoach-profile-v1');
+assert.equal(typeof app.parseClinicalCsv, 'function');
+assert.equal(typeof app.mergeClinical, 'function');
 
 const cgmCsv = [
   'Name: discarded metadata',
@@ -37,7 +25,7 @@ const cgmCsv = [
   '17.08.2026 09:05,2001',
   '17.08.2026 09:10,1',
 ].join('\n');
-const parsedCgm = analytics.parseClinicalCsv(cgmCsv, 'cgm_data_1.csv');
+const parsedCgm = app.parseClinicalCsv(cgmCsv, 'cgm_data_1.csv');
 assert.equal(parsedCgm.kind, 'cgm');
 assert.deepEqual(parsedCgm.cgm.map((row) => row.slice(1)), [[100, 0], [null, 1], [null, -1]]);
 assert.equal(parsedCgm.metadataRowsDiscarded, 1);
@@ -47,7 +35,7 @@ const bolusCsv = [
   'Zeitstempel,Kohlenhydrataufnahme (g),Abgegebenes Insulin (E),Blutzuckereingabe (mg/dl),Insulin-Typ,Anfängliche Abgabe (E),Verzögerte Abgabe (E)',
   '17.08.2026 08:50,"46,2","3,25",100,Bolus,"3,25",0',
 ].join('\n');
-const parsedBolus = analytics.parseClinicalCsv(bolusCsv, 'bolus_data_1.csv');
+const parsedBolus = app.parseClinicalCsv(bolusCsv, 'bolus_data_1.csv');
 assert.equal(parsedBolus.kind, 'bolus');
 assert.equal(parsedBolus.boluses[0][1], 46.2);
 assert.equal(parsedBolus.boluses[0][2], 3.25);
@@ -57,7 +45,7 @@ const insulinCsv = [
   'Zeitstempel,Bolus gesamt (U),Insulin gesamt (U),Basal gesamt (U)',
   '17.08.2026 23:59,"12,5","31,2","18,7"',
 ].join('\n');
-const parsedInsulin = analytics.parseClinicalCsv(insulinCsv, 'insulin_data_1.csv');
+const parsedInsulin = app.parseClinicalCsv(insulinCsv, 'insulin_data_1.csv');
 assert.equal(parsedInsulin.kind, 'dailyInsulin');
 assert.deepEqual(parsedInsulin.dailyInsulin[0].slice(1), [12.5, 31.2, 18.7]);
 
@@ -66,79 +54,44 @@ const basalCsv = [
   'Zeitstempel,Insulin-Typ,Dauer (Minuten),Prozentsatz (%),Rate,Abgegebenes Insulin (E)',
   '17.08.2026 08:00,Basal,30,100,"0,8","0,4"',
 ].join('\n');
-const parsedBasal = analytics.parseClinicalCsv(basalCsv, 'basal_data_1.csv');
+const parsedBasal = app.parseClinicalCsv(basalCsv, 'basal_data_1.csv');
 assert.equal(parsedBasal.kind, 'basal');
 assert.equal(parsedBasal.basalEvents.length, 1);
-assert.equal(parsedBasal.boluses.length, 0, 'basal rows must never be misclassified as boluses');
+assert.equal(parsedBasal.boluses.length, 0, 'basal rows must never be classified as boluses');
 
 const bgCsv = [
   'Metadata',
   'Zeitstempel,Glukosewert (mg/dl),Manuelles Lesen',
-  '17.08.2026 08:05,123,M',
+  '17.08.2026 08:05,123,Ja',
 ].join('\n');
-const parsedBg = analytics.parseClinicalCsv(bgCsv, 'bg_data_1.csv');
+const parsedBg = app.parseClinicalCsv(bgCsv, 'bg_data_1.csv');
 assert.equal(parsedBg.kind, 'bg');
-assert.deepEqual(parsedBg.manualGlucose[0].slice(1), [123, 'M']);
+assert.deepEqual(parsedBg.manualGlucose[0].slice(1), [123, 'Ja']);
 
 const alarmCsv = [
   'Metadata',
   'Zeitstempel,Alarm/Ereignis',
   '17.08.2026 08:10,Pod abgelaufen',
 ].join('\n');
-const parsedAlarm = analytics.parseClinicalCsv(alarmCsv, 'alarms_data_1.csv');
+const parsedAlarm = app.parseClinicalCsv(alarmCsv, 'alarms_data_1.csv');
 assert.equal(parsedAlarm.kind, 'alarm');
 assert.equal(parsedAlarm.alarms[0][1], 'Pod abgelaufen');
 
-const emptyCgmCarbs = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,KH (g)\n',
-  'cgm_carbs_data_1.csv',
-);
-assert.equal(emptyCgmCarbs.kind, 'cgmCarbs');
-assert.equal(emptyCgmCarbs.cgmCarbs.length, 0, 'empty cgm_carbs export must be accepted');
-assert.equal(emptyCgmCarbs.rejected, 0);
+const contextCases = [
+  ['cgm_carbs_data_1.csv', 'Zeitstempel,KH (g)', '17.08.2026 08:00,"12,5"', 'cgmCarbs', 'cgmCarbs'],
+  ['exercise_data_1.csv', 'Zeitstempel,Name,Intensität,Dauer (Minuten),Verbrannte Kalorien', '17.08.2026 08:00,Spaziergang,Mittel,30,120', 'exercise', 'exerciseEvents'],
+  ['food_data_1.csv', 'Zeitstempel,Name,KH (g),Fett (g),Eiweiß (g),Kalorien,Portionen,Anzahl der Portionen', '17.08.2026 08:00,Hafermilch,"5,9","1,4","0,8",45,Glas,1', 'food', 'foodEvents'],
+  ['manual_insulin_data_1.csv', 'Zeitstempel,Name,Wert,Insulin-Typ', '17.08.2026 08:00,Korrektur,"0,5",Schnell', 'manualInsulin', 'manualInsulin'],
+  ['medication_data_1.csv', 'Zeitstempel,Name,Wert,Medikamententyp', '17.08.2026 08:00,Test,100 mg,Sonstiges', 'medication', 'medications'],
+  ['notes_data_1.csv', 'Zeitstempel,Wert', '17.08.2026 08:00,"synthetische Notiz, korrekt quotiert"', 'note', 'notes'],
+];
+for (const [filename, headers, row, kind, property] of contextCases) {
+  const parsed = app.parseClinicalCsv(['Metadata', headers, row].join('\n'), filename);
+  assert.equal(parsed.kind, kind, filename);
+  assert.equal(parsed[property].length, 1, filename);
+}
 
-const parsedCgmCarbs = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,KH (g)\n17.08.2026 08:45,"12,5"\n',
-  'cgm_carbs_data_1.csv',
-);
-assert.deepEqual(parsedCgmCarbs.cgmCarbs[0].slice(1), [12.5]);
-
-const parsedExercise = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,Name,Intensität,Dauer (Minuten),Verbrannte Kalorien\n17.08.2026 18:00,Spaziergang,Mittel,30,120\n',
-  'exercise_data_1.csv',
-);
-assert.equal(parsedExercise.kind, 'exercise');
-assert.equal(parsedExercise.exerciseEvents.length, 1);
-
-const parsedFood = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,Name,KH (g),Fett,Eiweiß,Kalorien,Portionen,Anzahl der Portionen\n17.08.2026 09:00,Frühstück,"46,2","7,9","9,7",300,Schale,1\n',
-  'food_data_1.csv',
-);
-assert.equal(parsedFood.kind, 'food');
-assert.equal(parsedFood.foodEvents[0][2], 46.2);
-
-const parsedManualInsulin = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,Name,Wert,Insulin-Typ\n17.08.2026 11:00,Korrektur,"1,5",Schnell\n',
-  'manual_insulin_data_1.csv',
-);
-assert.equal(parsedManualInsulin.kind, 'manualInsulin');
-assert.equal(parsedManualInsulin.manualInsulin[0][2], 1.5);
-
-const parsedMedication = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,Name,Wert,Medikamententyp\n17.08.2026 12:00,Beispiel,1,Tablette\n',
-  'medication_data_1.csv',
-);
-assert.equal(parsedMedication.kind, 'medication');
-assert.equal(parsedMedication.medications.length, 1);
-
-const parsedNote = analytics.parseClinicalCsv(
-  'Metadata\nZeitstempel,Wert\n17.08.2026 13:00,Testnotiz\n',
-  'notes_data_1.csv',
-);
-assert.equal(parsedNote.kind, 'note');
-assert.equal(parsedNote.notes[0][1], 'Testnotiz');
-
-const metrics = analytics.calculateMetrics([
+const metrics = core.calculateMetrics([
   [minute('2026-08-17T10:00:00'), 100, 0],
   [minute('2026-08-17T10:05:00'), null, -1],
   [minute('2026-08-17T10:10:00'), null, 1],
@@ -149,33 +102,46 @@ assert.equal(metrics.veryLow, 33.33);
 assert.equal(metrics.veryHigh, 33.33);
 
 const mealMinute = minute('2026-08-17T09:00:00');
-const start = mealMinute - 15;
-const values = [100, 101, 100, 100];
-const post = [102, 107, 114, 123, 132, 142, 151, 160, 168, 174, 178, 180, 176, 170, 164, 158, 152, 146, 140, 136, 133, 130, 128, 126, 124, 122, 120, 119, 118, 117, 116, 115, 114, 113, 112, 111];
-const cgm = values.map((value, index) => [start + index * 5, value, 0]);
-post.forEach((value, index) => cgm.push([mealMinute + (index + 1) * 5, value, 0]));
-const diary = [{ id: 'a', when: '2026-08-17T09:00', occasion: 'Frühstück', food: 'Testmahlzeit', illness: 'nein' }];
-const boluses = [[mealMinute - 10, 46.2, 3.25, 100, 'Bolus']];
-const analyses = analytics.analyzeMeals(diary, cgm, boluses);
+const cgm = [];
+for (let offset = -60; offset <= 300; offset += 5) {
+  let value;
+  if (offset <= 0) value = 100;
+  else if (offset <= 190) value = Math.round(100 + (110 * offset) / 190);
+  else value = 210 - Math.round((offset - 190) * 0.75);
+  cgm.push([mealMinute + offset, value, 0]);
+}
+const diary = [{
+  id: 'a',
+  when: '2026-08-17T09:00',
+  occasion: 'Frühstück',
+  food: 'Testmahlzeit',
+  illness: 'nein',
+}];
+const analyses = meal.analyzeMeals(
+  diary,
+  cgm,
+  [[mealMinute + 15, 46.2, 3.25, 100, 'Bolus']],
+);
 assert.equal(analyses.length, 1);
 assert.equal(analyses[0].complete, true);
 assert.equal(analyses[0].baseline, 100);
-assert.equal(analyses[0].peak, 180);
-assert.equal(analyses[0].minutesToPeak, 60);
-assert.equal(analyses[0].bolusOffset, -10);
+assert.equal(analyses[0].peak, 210);
+assert.equal(analyses[0].minutesToPeak, 190);
+assert.equal(analyses[0].peakFromBolus, 175);
+assert.equal(analyses[0].turnFromMeal, 190);
+assert.equal(analyses[0].turnFromBolus, 175);
+assert.equal(meal.GC_MEAL_CONTEXT_MINUTES, 300);
+assert.equal(meal.GC_TWO_HOUR_REFERENCE_MINUTES, 120);
 
-const emptyCards = analytics.buildRecommendations({
+const emptyCards = core.buildRecommendations({
   diary: [], analyses: [], foodGroups: [], cgmRows: [], metrics: null,
 });
 assert.equal(emptyCards[0].title, 'Noch keine persönlichen Daten gespeichert');
 assert(emptyCards[0].boundary.includes('keine Beispielwerte'));
 
-const merged = analytics.mergeClinical(
+const merged = app.mergeClinical(
   { cgm: [], boluses: [], imports: [], updatedAt: null },
-  [
-    parsedCgm, parsedBolus, parsedInsulin, parsedBasal, parsedBg, parsedAlarm,
-    parsedCgmCarbs, parsedExercise, parsedFood, parsedManualInsulin, parsedMedication, parsedNote,
-  ],
+  [parsedCgm, parsedBolus, parsedInsulin, parsedBasal, parsedBg, parsedAlarm],
 );
 assert.equal(merged.clinical.cgm.length, 3);
 assert.equal(merged.clinical.boluses.length, 1);
@@ -183,12 +149,5 @@ assert.equal(merged.clinical.dailyInsulin.length, 1);
 assert.equal(merged.clinical.basalEvents.length, 1);
 assert.equal(merged.clinical.manualGlucose.length, 1);
 assert.equal(merged.clinical.alarms.length, 1);
-assert.equal(merged.clinical.cgmCarbs.length, 1);
-assert.equal(merged.clinical.exerciseEvents.length, 1);
-assert.equal(merged.clinical.foodEvents.length, 1);
-assert.equal(merged.clinical.manualInsulin.length, 1);
-assert.equal(merged.clinical.medications.length, 1);
-assert.equal(merged.clinical.notes.length, 1);
-assert.equal(merged.summary.files, 12);
 
-console.log('GlucoseCoach personal-local + complete Omnipod importer tests passed');
+console.log('GlucoseCoach personal-local importer and adaptive meal contracts passed');

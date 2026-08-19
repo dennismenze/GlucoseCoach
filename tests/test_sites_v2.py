@@ -13,17 +13,35 @@ IMPORTERS = (ROOT / "docs" / "app-importers.js").read_text(encoding="utf-8")
 CONTEXT_IMPORTERS = (ROOT / "docs" / "app-importers-context.js").read_text(encoding="utf-8")
 UI_CONTRACT = (ROOT / "docs" / "app-ui-contract.js").read_text(encoding="utf-8")
 MEAL_WINDOW = (ROOT / "docs" / "app-meal-window.js").read_text(encoding="utf-8")
+INSULIN_ACTION = (ROOT / "docs" / "app-insulin-action.js").read_text(encoding="utf-8")
 BUNDLE = "\n".join(
-    (HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW)
+    (
+        HTML,
+        LOADER,
+        CORE,
+        IMPORTERS,
+        CONTEXT_IMPORTERS,
+        UI_CONTRACT,
+        MEAL_WINDOW,
+        INSULIN_ACTION,
+    )
 )
 
 
 class PersonalSitesContractTests(unittest.TestCase):
     def test_new_browser_has_no_published_patient_baseline(self) -> None:
         forbidden = [
-            "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
-            "Veröffentlichter Ausgangsstand", "07.05.–04.08.2026",
-            "202 mg/dl", "95 Minuten", "STATIC_BASELINE",
+            "25.382",
+            "25382",
+            "138.5",
+            "6.62",
+            "82.22",
+            "16.55",
+            "Veröffentlichter Ausgangsstand",
+            "07.05.–04.08.2026",
+            "202 mg/dl",
+            "95 Minuten",
+            "STATIC_BASELINE",
         ]
         leaks = [value for value in forbidden if value in BUNDLE]
         self.assertFalse(leaks, f"published patient baseline leaked into public site: {leaks}")
@@ -88,13 +106,40 @@ class PersonalSitesContractTests(unittest.TestCase):
             "CGM-Wendepunkt-Proxy",
             "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
-            "kein passender positiver Bolus gefunden",
-            "CGM-Wert in den ersten 120 Minuten",
-            "kein Nachweis",
-            "GC_POSTPRANDIAL_PEAK_MINUTES",
+            "GC_TWO_HOUR_REFERENCE_MINUTES",
+            "GC_MEAL_CONTEXT_MINUTES",
+            "GC_DECLINE_CONFIRMATION_MINUTES",
+            "GC_DECLINE_DROP_MGDL",
+            "nicht mehr auf zwei Stunden begrenzt",
+            "letzten positiven Bolus",
+            "Peak-Start neu",
+            "2-h-Wert bleibt nur ein Referenzwert",
+            "pharmakologischen Insulin-Wirkbeginns",
         ]
         missing = [value for value in required if value not in BUNDLE]
-        self.assertFalse(missing, f"missing analysis boundaries: {missing}")
+        self.assertFalse(missing, f"missing meal-analysis boundaries: {missing}")
+
+    def test_insulin_action_analysis_is_bounded_and_personal(self) -> None:
+        required = [
+            'data-panel="insulin-action"',
+            'id="insulin-action"',
+            "Geschätzte effektive Glukosesenkungswirkung",
+            "streng isolierte Korrekturereignisse",
+            "Aus Mahlzeitenboli wird keine pharmakodynamische Wirkzeit abgeleitet",
+            "GC_INSULIN_ACTION_WINDOW_MINUTES",
+            "ACTION_WINDOW_MINUTES = 300",
+            "MIN_CGM_COVERAGE = 0.80",
+            "END_REMAINING_FRACTION = 0.10",
+            "analyzeInsulinAction",
+            "effectOnset",
+            "maximumDropRate",
+            "stablePhase",
+            "positiveAuc",
+            "keine Empfehlung zur Änderung von Pumpenparametern",
+            "Die Pumpeneinstellung von 2 Stunden wird für diese Schätzung nicht verwendet",
+        ]
+        missing = [value for value in required if value not in BUNDLE]
+        self.assertFalse(missing, f"missing insulin-action contract: {missing}")
 
     def test_no_direct_identifier_or_email_is_hardcoded(self) -> None:
         self.assertIsNone(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", BUNDLE))
@@ -107,38 +152,57 @@ class PersonalSitesContractTests(unittest.TestCase):
             "app-importers-context.js",
             "app-ui-contract.js",
             "app-meal-window.js",
+            "app-insulin-action.js",
         )
         for module in modules:
             self.assertIn(module, LOADER)
         for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
             self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
-        for source in (CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW):
+        for source in (
+            CORE,
+            IMPORTERS,
+            CONTEXT_IMPORTERS,
+            UI_CONTRACT,
+            MEAL_WINDOW,
+            INSULIN_ACTION,
+        ):
             self.assertIn("module.exports", source)
 
     def test_e2e_contract_is_present(self) -> None:
-        spec = ROOT / "e2e" / "glucosecoach.e2e.spec.cjs"
-        peak_spec = ROOT / "e2e" / "postprandial-peak.e2e.spec.cjs"
-        oracle = ROOT / "e2e" / "oracle.cjs"
-        config = ROOT / "playwright.config.cjs"
-        workflow = ROOT / ".github" / "workflows" / "e2e.yml"
-        for path in (spec, peak_spec, oracle, config, workflow):
-            self.assertTrue(path.is_file(), f"missing E2E artifact: {path.relative_to(ROOT)}")
-        spec_text = spec.read_text(encoding="utf-8")
-        self.assertIn("SEEDS", spec_text)
-        self.assertIn("WINDOW_VALUES = ['7', '14', '30', '90', 'all']", spec_text)
-        self.assertIn("assertStoredData", spec_text)
-        self.assertIn("assertMealAnalysis", spec_text)
-        self.assertIn("assertQuality", spec_text)
-        peak_text = peak_spec.read_text(encoding="utf-8")
-        self.assertIn("latePeak", peak_text)
-        self.assertIn("2-h-Peak", peak_text)
-        self.assertIn("0–120 Minuten", peak_text)
-
-    def test_node_logic_suite(self) -> None:
-        subprocess.run(
-            ["node", str(ROOT / "tests" / "sites_logic_test.cjs")],
-            check=True,
+        paths = (
+            ROOT / "e2e" / "glucosecoach.e2e.spec.cjs",
+            ROOT / "e2e" / "postprandial-peak.e2e.spec.cjs",
+            ROOT / "e2e" / "insulin-action.e2e.spec.cjs",
+            ROOT / "e2e" / "insulin-action-oracle.cjs",
+            ROOT / "e2e" / "oracle.cjs",
+            ROOT / "playwright.config.cjs",
+            ROOT / ".github" / "workflows" / "e2e.yml",
         )
+        for path in paths:
+            self.assertTrue(path.is_file(), f"missing E2E artifact: {path.relative_to(ROOT)}")
+        main_spec = paths[0].read_text(encoding="utf-8")
+        self.assertIn("SEEDS", main_spec)
+        self.assertIn("WINDOW_VALUES = ['7', '14', '30', '90', 'all']", main_spec)
+        self.assertIn("assertStoredData", main_spec)
+        self.assertIn("assertMealAnalysis", main_spec)
+        self.assertIn("assertQuality", main_spec)
+        self.assertIn("toHaveCount(7)", main_spec)
+        peak_text = paths[1].read_text(encoding="utf-8")
+        self.assertIn("mehr als zwei oder drei Stunden", peak_text)
+        self.assertIn("nach letztem Bolus", peak_text)
+        self.assertIn("220 min nach Essen", peak_text)
+        self.assertIn("CGM-Wendepunkt-Proxy", peak_text)
+        insulin_text = paths[2].read_text(encoding="utf-8")
+        self.assertIn("assertEveryDisplayedInsulinNumber", insulin_text)
+        self.assertIn("insulin-action-oracle.cjs", insulin_text)
+
+    def test_node_logic_suites(self) -> None:
+        for script in (
+            ROOT / "tests" / "sites_logic_test.cjs",
+            ROOT / "tests" / "postprandial_peak_test.cjs",
+            ROOT / "tests" / "insulin_action_test.cjs",
+        ):
+            subprocess.run(["node", str(script)], check=True)
 
 
 if __name__ == "__main__":

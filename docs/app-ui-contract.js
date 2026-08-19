@@ -2,9 +2,11 @@
   'use strict';
 
   const SUPPORTED_OMNIPOD_TYPE_COUNT = 12;
+  const METHODOLOGICAL_BOUNDARY =
+    'Ein CGM-Kurvenproxy ist kein direkter pharmakologischer Wirkeintritt und keine Dosisempfehlung.';
 
   if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-    module.exports = { SUPPORTED_OMNIPOD_TYPE_COUNT };
+    module.exports = { SUPPORTED_OMNIPOD_TYPE_COUNT, METHODOLOGICAL_BOUNDARY };
     return;
   }
 
