@@ -3,12 +3,18 @@
 
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
+      const mealWindow = require('./app-meal-window.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
         ...require('./app-importers-context.js'),
         ...require('./app-ui-contract.js'),
-        ...require('./app-meal-window.js'),
+        analyzeMealTwoHourPeak: mealWindow.analyzeMealTwoHourPeak,
+        analyzeMeals: mealWindow.analyzeMeals,
+        buildFoodComparisons: mealWindow.buildFoodComparisons,
+        buildRecommendations: mealWindow.buildRecommendations,
+        GC_POSTPRANDIAL_PEAK_MINUTES: mealWindow.GC_POSTPRANDIAL_PEAK_MINUTES,
+        GC_MEAL_CONTEXT_MINUTES: mealWindow.GC_MEAL_CONTEXT_MINUTES,
       };
     }
     return;
