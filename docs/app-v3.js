@@ -9,12 +9,7 @@
         ...require('./app-importers.js'),
         ...require('./app-importers-context.js'),
         ...require('./app-ui-contract.js'),
-        analyzeMealTwoHourPeak: mealWindow.analyzeMealTwoHourPeak,
-        analyzeMeals: mealWindow.analyzeMeals,
-        buildFoodComparisons: mealWindow.buildFoodComparisons,
-        buildRecommendations: mealWindow.buildRecommendations,
-        GC_POSTPRANDIAL_PEAK_MINUTES: mealWindow.GC_POSTPRANDIAL_PEAK_MINUTES,
-        GC_MEAL_CONTEXT_MINUTES: mealWindow.GC_MEAL_CONTEXT_MINUTES,
+        ...mealWindow,
       };
     }
     return;
