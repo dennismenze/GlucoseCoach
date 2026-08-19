@@ -68,7 +68,11 @@ jobs:
               "notes_data_",
               "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
               "GC_POSTPRANDIAL_PEAK_MINUTES",
-              "CGM-Wert in den ersten 120 Minuten",
+              "GC_DECLINE_CONFIRMATION_MINUTES",
+              "GC_DECLINE_DROP_MGDL",
+              "nicht ab der Bolusabgabe",
+              "vier weitere zusammenhängende Messwerte",
+              "beweist keinen Insulin-Wirkbeginn",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
@@ -91,8 +95,10 @@ jobs:
           node --check docs/app-meal-window.js
           node --check tests/postprandial_peak_test.cjs
           node --check e2e/oracle.cjs
+          node --check e2e/oracle-two-hour-patch.cjs
           node --check e2e/glucosecoach.e2e.spec.cjs
           node --check e2e/postprandial-peak.e2e.spec.cjs
+          node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
 
       - name: Run repository validator
