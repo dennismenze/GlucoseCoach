@@ -50,12 +50,34 @@ Die Suite soll weiterhin:
 - Tagebucheinträge über das echte UI-Formular anlegen;
 - die unterstützten Omnipod-CSV-Dateitypen über das echte Datei-Input importieren;
 - `localStorage` gegen den erwarteten Datensatz prüfen;
-- die Tabs `Überblick`, `Empfehlungen`, `Mahlzeitenanalyse`, `Tagebuch`, `CSV-Daten` und `Datenqualität` durchlaufen;
+- die Tabs `Überblick`, `Empfehlungen`, `Mahlzeitenanalyse`, `Insulinwirkung`, `Tagebuch`, `CSV-Daten` und `Datenqualität` abdecken;
 - alle dort dargestellten berechneten Zahlen gegen ein vom Rendering unabhängiges Oracle vergleichen;
 - 7-, 14-, 30-, 90-Tage- und Gesamtansicht prüfen;
 - Browser-Console-Errors und uncaught page errors als Fehler behandeln.
 
+Für `Insulinwirkung` gilt zusätzlich:
+
+- das Oracle darf nicht die Produktfunktion `analyzeInsulinAction` importieren;
+- jede dargestellte berechnete Zahl in Zusammenfassung, Aggregat, Wirkungskurve, Gruppen und Einzelereignissen muss geprüft werden;
+- Fixtures müssen sowohl streng isolierte Korrekturen als auch auszuschließende Mahlzeiten-, Sport- oder Überlappungsereignisse abdecken;
+- die Zwei-Stunden-Pumpeneinstellung darf nicht als tatsächliches Ende der Insulinwirkung behandelt werden;
+- Mahlzeitenboli dürfen nicht in die aggregierte persönliche Wirkzeit eingehen;
+- zensierte Ereignisse und Unsicherheitsangaben dürfen nicht stillschweigend entfernt werden.
+
 Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constraints wie `step`, `min` und `max` einzuhalten und CSV-Felder mit Trennzeichen korrekt zu quoten. Ein Test soll nicht wegen absichtlich oder versehentlich ungültiger Fixture-Daten fehlschlagen, außer genau diese Validierung wird getestet.
+
+## Medizinisch-methodische Grenzen
+
+GlucoseCoach ist eine retrospektive Musteranalyse. Coding-Agenten dürfen aus CGM-Kurven keinen sicheren pharmakologischen Wirkeintritt behaupten und keine automatische Änderung von Bolus, Basalrate, Insulinfaktor, Korrekturfaktor oder Pumpen-Wirkzeit ableiten.
+
+Insulinwirkungsanalysen müssen deshalb:
+
+- zwischen beobachtetem CGM-Verlauf und modellierter trendbereinigter Wirkung unterscheiden;
+- für aggregierte Wirkzeitschätzungen ausschließlich ausreichend isolierte Korrekturereignisse verwenden;
+- Nahrung/Kohlenhydrate, weitere Boli, Aktivität, Krankheit, Hypobehandlung, Basaländerungen, Pumpenereignisse, CGM-Lücken und instabile Ausgangstrends als Störvariablen behandeln;
+- Mindestfallzahl, mittlere 50%-Intervalle, Qualitätsstufe und nicht innerhalb des Fensters abgeklungene Ereignisse ausweisen;
+- eine stabile Glukosephase nicht mit dem Ende der Insulinwirkung gleichsetzen;
+- bestehende persönliche Daten ausschließlich lokal verarbeiten.
 
 ## Umgang mit Testfehlern
 
