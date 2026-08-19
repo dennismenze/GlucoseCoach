@@ -13,8 +13,24 @@ IMPORTERS = (ROOT / "docs" / "app-importers.js").read_text(encoding="utf-8")
 CONTEXT_IMPORTERS = (ROOT / "docs" / "app-importers-context.js").read_text(encoding="utf-8")
 UI_CONTRACT = (ROOT / "docs" / "app-ui-contract.js").read_text(encoding="utf-8")
 MEAL_WINDOW = (ROOT / "docs" / "app-meal-window.js").read_text(encoding="utf-8")
+INSULIN_CORE = (ROOT / "docs" / "app-insulin-core.js").read_text(encoding="utf-8")
+INSULIN_MODEL = (ROOT / "docs" / "app-insulin-model.js").read_text(encoding="utf-8")
+INSULIN_UI = (ROOT / "docs" / "app-insulin-ui.js").read_text(encoding="utf-8")
+INSULIN_CSS = (ROOT / "docs" / "insulin-effect.css").read_text(encoding="utf-8")
 BUNDLE = "\n".join(
-    (HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW)
+    (
+        HTML,
+        LOADER,
+        CORE,
+        IMPORTERS,
+        CONTEXT_IMPORTERS,
+        UI_CONTRACT,
+        MEAL_WINDOW,
+        INSULIN_CORE,
+        INSULIN_MODEL,
+        INSULIN_UI,
+        INSULIN_CSS,
+    )
 )
 
 
@@ -33,6 +49,7 @@ class PersonalSitesContractTests(unittest.TestCase):
             "glucosecoach-profile-v1",
             "glucosecoach-diary-v1",
             "glucosecoach-clinical-v1",
+            "glucosecoach-insulin-settings-v1",
             "Ein neuer Browser startet ohne Gesundheitsdaten",
             "Noch keine persönlichen CGM-Daten",
             "Es werden keine Beispielwerte oder Daten anderer Nutzer eingeblendet",
@@ -89,12 +106,37 @@ class PersonalSitesContractTests(unittest.TestCase):
             "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
             "kein passender positiver Bolus gefunden",
-            "CGM-Wert in den ersten 120 Minuten",
-            "kein Nachweis",
             "GC_POSTPRANDIAL_PEAK_MINUTES",
+            "GC_DECLINE_CONFIRMATION_MINUTES",
+            "GC_DECLINE_DROP_MGDL",
+            "Bolusabgabe",
+            "vier weitere zusammenhängende Messwerte",
+            "beweist keinen Insulin-Wirkbeginn",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing analysis boundaries: {missing}")
+
+    def test_personal_insulin_effect_contract_is_present(self) -> None:
+        required = [
+            "analyzeBolusEvents",
+            "buildInsulinEffectModel",
+            "buildInsulinSubgroups",
+            "isolierte Korrekturboli",
+            "nicht der pharmakologischen Insulinwirkung",
+            "keine Dosis- oder Pumpeneinstellungsempfehlung",
+            "erkennbarer Senkungsbeginn",
+            "stärkste Senkungsrate",
+            "erste stabile Phase",
+            "Ende der Senkungsphase",
+            "PREVIOUS_INSULIN_EXCLUSION_MINUTES",
+            "NEXT_INSULIN_EXCLUSION_MINUTES",
+            "MODEL_MIN_EVENTS",
+            "endCensoredPercent",
+            "timeOfDay",
+            "doseBand",
+        ]
+        missing = [value for value in required if value not in BUNDLE]
+        self.assertFalse(missing, f"missing personal insulin-effect contract: {missing}")
 
     def test_no_direct_identifier_or_email_is_hardcoded(self) -> None:
         self.assertIsNone(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", BUNDLE))
@@ -107,32 +149,55 @@ class PersonalSitesContractTests(unittest.TestCase):
             "app-importers-context.js",
             "app-ui-contract.js",
             "app-meal-window.js",
+            "app-insulin-core.js",
+            "app-insulin-model.js",
+            "app-insulin-ui.js",
         )
         for module in modules:
             self.assertIn(module, LOADER)
         for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
             self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
-        for source in (CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW):
+        for source in (
+            CORE,
+            IMPORTERS,
+            CONTEXT_IMPORTERS,
+            UI_CONTRACT,
+            MEAL_WINDOW,
+            INSULIN_CORE,
+            INSULIN_MODEL,
+            INSULIN_UI,
+        ):
             self.assertIn("module.exports", source)
 
     def test_e2e_contract_is_present(self) -> None:
-        spec = ROOT / "e2e" / "glucosecoach.e2e.spec.cjs"
-        peak_spec = ROOT / "e2e" / "postprandial-peak.e2e.spec.cjs"
-        oracle = ROOT / "e2e" / "oracle.cjs"
+        specs = (
+            ROOT / "e2e" / "glucosecoach.e2e.spec.cjs",
+            ROOT / "e2e" / "postprandial-peak.e2e.spec.cjs",
+            ROOT / "e2e" / "insulin-effect.e2e.spec.cjs",
+        )
+        oracles = (
+            ROOT / "e2e" / "oracle.cjs",
+            ROOT / "e2e" / "insulin-oracle.cjs",
+        )
         config = ROOT / "playwright.config.cjs"
         workflow = ROOT / ".github" / "workflows" / "e2e.yml"
-        for path in (spec, peak_spec, oracle, config, workflow):
+        for path in (*specs, *oracles, config, workflow):
             self.assertTrue(path.is_file(), f"missing E2E artifact: {path.relative_to(ROOT)}")
-        spec_text = spec.read_text(encoding="utf-8")
+        spec_text = specs[0].read_text(encoding="utf-8")
         self.assertIn("SEEDS", spec_text)
         self.assertIn("WINDOW_VALUES = ['7', '14', '30', '90', 'all']", spec_text)
         self.assertIn("assertStoredData", spec_text)
         self.assertIn("assertMealAnalysis", spec_text)
         self.assertIn("assertQuality", spec_text)
-        peak_text = peak_spec.read_text(encoding="utf-8")
+        peak_text = specs[1].read_text(encoding="utf-8")
         self.assertIn("latePeak", peak_text)
         self.assertIn("2-h-Peak", peak_text)
-        self.assertIn("0–120 Minuten", peak_text)
+        self.assertIn("sustained decline cannot precede the peak", peak_text)
+        insulin_text = specs[2].read_text(encoding="utf-8")
+        self.assertIn("every displayed insulin-effect number", insulin_text)
+        self.assertIn("assertModelMetrics", insulin_text)
+        self.assertIn("assertEffectCurve", insulin_text)
+        self.assertIn("assertEventCards", insulin_text)
 
     def test_node_logic_suite(self) -> None:
         subprocess.run(
