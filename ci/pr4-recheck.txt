@@ -1,1 +1,0 @@
-PR 4 verification trigger after the default-branch merge gate was installed.
