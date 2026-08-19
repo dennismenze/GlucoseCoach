@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  const PEAK_WINDOW_MINUTES = 120;
-  const EXTENDED_CONTEXT_MINUTES = 180;
+  const TWO_HOUR_REFERENCE_MINUTES = 120;
+  const MEAL_CONTEXT_MINUTES = 300;
+  const BOLUS_LOOKBACK_MINUTES = 60;
   const DECLINE_CONFIRMATION_POINTS = 4;
   const DECLINE_CONFIRMATION_MINUTES = 20;
   const DECLINE_MAX_POINT_GAP_MINUTES = 7;
@@ -43,18 +44,24 @@
   }
 
   function median(values) {
-    if (!values.length) return null;
-    const sorted = [...values].sort((a, b) => a - b);
+    const valid = values.filter(Number.isFinite);
+    if (!valid.length) return null;
+    const sorted = [...valid].sort((a, b) => a - b);
     const middle = Math.floor(sorted.length / 2);
-    return sorted.length % 2
-      ? sorted[middle]
-      : (sorted[middle - 1] + sorted[middle]) / 2;
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
   }
 
   function closest(rows, target) {
     return [...rows].sort(
       (a, b) => Math.abs(a[0] - target) - Math.abs(b[0] - target),
     )[0] || null;
+  }
+
+  function positiveBoluses(boluses, start, end) {
+    return [...(boluses || [])]
+      .filter((row) => Number.isFinite(Number(row?.[0])))
+      .filter((row) => row[0] >= start && row[0] <= end && Number(row[2]) > 0)
+      .sort((a, b) => a[0] - b[0]);
   }
 
   function contiguousConfirmation(rows, startIndex) {
@@ -76,20 +83,20 @@
     return future;
   }
 
-  function findSustainedDecline(post, peakRow) {
-    const firstEligibleIndex = post.findIndex((row) => row[0] >= peakRow[0]);
+  function findSustainedDecline(rows, earliestMinute) {
+    const firstEligibleIndex = rows.findIndex((row) => row[0] >= earliestMinute);
     if (firstEligibleIndex < 0) return null;
 
-    for (let index = firstEligibleIndex; index < post.length; index += 1) {
-      const candidate = post[index];
-      const future = contiguousConfirmation(post, index);
+    for (let index = firstEligibleIndex; index < rows.length; index += 1) {
+      const candidate = rows[index];
+      const future = contiguousConfirmation(rows, index);
       if (!future) continue;
 
       const sequence = [candidate, ...future];
       const nonIncreasingSteps = future
         .map((row, deltaIndex) => row[1] - sequence[deltaIndex][1])
         .filter((delta) => delta <= DECLINE_STEP_TOLERANCE_MGDL).length;
-      const remaining = post.slice(index + 1);
+      const remaining = rows.slice(index + 1);
       const highestLaterValue = remaining.length
         ? Math.max(...remaining.map((row) => row[1]))
         : candidate[1];
@@ -107,21 +114,23 @@
     return null;
   }
 
-  function analyzeMealTwoHourPeak(entry, cgm, boluses, nextMealMinute = null) {
+  function analyzeMealAdaptivePeak(entry, cgm, boluses, nextMealMinute = null) {
     const minute = parseTime(entry.when);
     if (minute === null) return { entry, complete: false, status: 'invalid-time' };
 
+    const naturalContextEnd = minute + MEAL_CONTEXT_MINUTES;
     const contextEnd = Math.min(
-      minute + EXTENDED_CONTEXT_MINUTES,
+      naturalContextEnd,
       Number.isFinite(nextMealMinute) && nextMealMinute > minute
         ? nextMealMinute - 1
         : Number.POSITIVE_INFINITY,
     );
-    const truncatedByNextMeal = contextEnd < minute + EXTENDED_CONTEXT_MINUTES;
-    const overlapsPeakWindow = contextEnd < minute + PEAK_WINDOW_MINUTES;
+    const truncatedByNextMeal = contextEnd < naturalContextEnd;
 
     const windowRows = (cgm || []).filter(
-      (row) => row[0] >= minute - 15 && row[0] <= contextEnd,
+      (row) => row[0] >= minute - BOLUS_LOOKBACK_MINUTES &&
+        row[0] <= contextEnd &&
+        row[1] !== null,
     );
     if (!windowRows.length) {
       return {
@@ -135,18 +144,19 @@
       };
     }
 
-    const pre = windowRows.filter((row) => row[0] <= minute && row[1] !== null);
-    const post = windowRows.filter((row) => row[0] >= minute + 5 && row[1] !== null);
-    const peakRows = post.filter((row) => row[0] <= minute + PEAK_WINDOW_MINUTES);
+    const pre = windowRows.filter((row) => row[0] <= minute);
+    const post = windowRows.filter((row) => row[0] >= minute + 5);
+    const firstTwoHours = post.filter((row) => row[0] <= minute + TWO_HOUR_REFERENCE_MINUTES);
 
-    if (!pre.length || peakRows.length < 18) {
+    if (!pre.length || firstTwoHours.length < 18) {
       return {
         entry,
         minute,
         complete: false,
-        status: overlapsPeakWindow ? 'overlapping-meal' : 'partial-cgm',
-        cgmPoints: peakRows.length,
-        peakWindowMinutes: PEAK_WINDOW_MINUTES,
+        status: truncatedByNextMeal && contextEnd < minute + TWO_HOUR_REFERENCE_MINUTES
+          ? 'overlapping-meal'
+          : 'partial-cgm',
+        cgmPoints: firstTwoHours.length,
         nextMealMinute,
         contextEnd,
         truncatedByNextMeal,
@@ -154,13 +164,9 @@
     }
 
     const baseline = pre.at(-1)[1];
-    const peakRow = peakRows.reduce(
-      (best, row) => row[1] > best[1] ? row : best,
-      peakRows[0],
-    );
     const two = closest(
       post.filter((row) => row[0] >= minute + 105 && row[0] <= minute + 135),
-      minute + PEAK_WINDOW_MINUTES,
+      minute + TWO_HOUR_REFERENCE_MINUTES,
     );
 
     let rise = null;
@@ -178,39 +184,71 @@
       }
     }
 
-    const bolus = [...(boluses || [])]
-      .filter((row) => row[0] >= minute - 60 && row[0] <= minute + 30 && Number(row[2]) > 0)
-      .sort((a, b) => Math.abs(a[0] - minute) - Math.abs(b[0] - minute))[0] || null;
+    const bolusesInContext = positiveBoluses(
+      boluses,
+      minute - BOLUS_LOOKBACK_MINUTES,
+      contextEnd,
+    );
+    const firstBolus = bolusesInContext[0] || null;
+    const declineSearchStart = firstBolus
+      ? Math.max(minute + 5, firstBolus[0] + 10)
+      : minute + 5;
+    const turn = findSustainedDecline(post, declineSearchStart);
+    const bolus = turn
+      ? [...bolusesInContext].filter((row) => row[0] <= turn[0]).at(-1) || null
+      : null;
 
-    const turn = findSustainedDecline(post, peakRow);
-    const complete = peakRows.length >= 18 && Boolean(two) && !overlapsPeakWindow;
+    const peakRows = turn && bolus
+      ? windowRows.filter((row) => row[0] >= bolus[0] && row[0] <= turn[0])
+      : [];
+    const peakRow = peakRows.length
+      ? peakRows.reduce((best, row) => row[1] > best[1] ? row : best, peakRows[0])
+      : null;
+    const bolusStartRow = bolus ? closest(windowRows, bolus[0]) : null;
+
+    let status = 'partial-analysis';
+    if (!bolusesInContext.length) status = 'missing-bolus';
+    else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
+    else if (!turn) status = 'no-stable-decline';
+    else if (!bolus || !peakRow) status = 'partial-analysis';
+    else if (!two) status = 'partial-analysis';
+    else status = 'complete';
+
+    const complete = status === 'complete';
 
     return {
       entry,
       minute,
       complete,
-      status: complete ? 'complete' : overlapsPeakWindow ? 'overlapping-meal' : 'partial-analysis',
+      status,
       baseline,
       minutesToRise: rise ? rise[0] - minute : null,
-      peak: peakRow[1],
-      minutesToPeak: peakRow[0] - minute,
-      peakDelta: peakRow[1] - baseline,
-      peakWindowMinutes: PEAK_WINDOW_MINUTES,
+      peak: peakRow?.[1] ?? null,
+      minutesToPeak: peakRow ? peakRow[0] - minute : null,
+      peakFromBolus: peakRow && bolus ? peakRow[0] - bolus[0] : null,
+      peakDelta: peakRow ? peakRow[1] - baseline : null,
+      peakDeltaFromBolus: peakRow && bolusStartRow
+        ? peakRow[1] - bolusStartRow[1]
+        : null,
       twoHour: two?.[1] ?? null,
       twoHourDelta: two ? two[1] - baseline : null,
       bolus,
       bolusOffset: bolus ? bolus[0] - minute : null,
+      bolusCountBeforeTurn: turn
+        ? bolusesInContext.filter((row) => row[0] <= turn[0]).length
+        : 0,
       turnMinute: turn?.[0] ?? null,
       turnFromMeal: turn ? turn[0] - minute : null,
       turnFromBolus: turn && bolus ? turn[0] - bolus[0] : null,
-      turnAfterPeak: turn ? turn[0] >= peakRow[0] : null,
+      turnAfterPeak: turn && peakRow ? turn[0] >= peakRow[0] : null,
       nextMealMinute,
       contextEnd,
       truncatedByNextMeal,
+      mealContextMinutes: MEAL_CONTEXT_MINUTES,
     };
   }
 
-  function analyzeMealsTwoHourPeak(diary, cgm, boluses) {
+  function analyzeMealsAdaptivePeak(diary, cgm, boluses) {
     const meals = (diary || [])
       .filter((entry) => MEAL_OCCASIONS.has(entry.occasion))
       .map((entry) => ({ entry, minute: parseTime(entry.when) }));
@@ -223,11 +261,11 @@
     });
 
     return meals.map(({ entry }) =>
-      analyzeMealTwoHourPeak(entry, cgm, boluses, nextMealByEntry.get(entry) ?? null),
+      analyzeMealAdaptivePeak(entry, cgm, boluses, nextMealByEntry.get(entry) ?? null),
     );
   }
 
-  function buildFoodComparisonsTwoHourPeak(analyses) {
+  function buildFoodComparisonsAdaptivePeak(analyses) {
     const groups = new Map();
     for (const analysis of analyses || []) {
       const key = String(analysis.entry?.food ?? '').trim().toLocaleLowerCase('de-DE');
@@ -247,33 +285,42 @@
         entries: group.all.length,
         analyzed: group.complete.length,
         medianPeakDelta: round(median(group.complete.map((item) => item.peakDelta)), 0),
-        medianMinutesToPeak: round(
-          median(group.complete.map((item) => item.minutesToPeak)),
+        medianMinutesToPeak: round(median(group.complete.map((item) => item.minutesToPeak)), 0),
+        medianMinutesBolusToPeak: round(
+          median(group.complete.map((item) => item.peakFromBolus)),
           0,
         ),
         medianTwoHourDelta: round(
-          median(group.complete.map((item) => item.twoHourDelta).filter(Number.isFinite)),
+          median(group.complete.map((item) => item.twoHourDelta)),
           0,
         ),
-        peakWindowMinutes: PEAK_WINDOW_MINUTES,
+        peakContextMinutes: MEAL_CONTEXT_MINUTES,
       }));
   }
 
-  function buildRecommendationsTwoHourPeak(input) {
+  function buildRecommendationsAdaptivePeak(input) {
     if (typeof baseRecommendations !== 'function') return [];
-    return baseRecommendations(input).map((card) => {
-      if (card.tag !== 'Beobachtung' || !card.title.includes('wiederholter persönlicher Vergleich')) {
-        return card;
-      }
+    const cards = baseRecommendations(input);
+    const groups = input?.foodGroups || [];
+
+    return cards.map((card) => {
+      const group = groups.find((candidate) =>
+        card.title === `${candidate.label}: wiederholter persönlicher Vergleich`,
+      );
+      if (!group || group.analyzed < 2) return card;
+
       return {
         ...card,
-        finding: card.finding
-          .replace('Peak-Anstieg', '2-h-Peak-Anstieg')
-          .replace(/ min\.$/, ' min innerhalb der ersten 120 Minuten.'),
+        finding:
+          `${group.analyzed} Wiederholungen zeigen im Median einen Peak-Anstieg von ` +
+          `${group.medianPeakDelta ?? '–'} mg/dl nach ${group.medianMinutesToPeak ?? '–'} min ` +
+          `ab Essen und ${group.medianMinutesBolusToPeak ?? '–'} min nach dem letzten Bolus ` +
+          'vor dem anhaltenden Rückgang.',
         boundary:
-          'Der 2-h-Peak ist nur zeitlich nach dem protokollierten Essen beobachtet. ' +
-          'Unprotokollierte Nahrung, Korrekturen, Bewegung und andere Einflüsse können beitragen; ' +
-          'der Vergleich ist keine Dosisempfehlung.',
+          'Der Peak ist der höchste persönliche CGM-Wert zwischen dem letzten positiven Bolus ' +
+          'vor dem stabil bestätigten Rückgang und diesem Rückgang. Weitere Boli setzen den ' +
+          'Peak-Start neu; eine neue protokollierte Mahlzeit beendet den Kontext. Das ist ' +
+          'beobachtend und keine Dosisempfehlung.',
       };
     });
   }
@@ -284,61 +331,106 @@
 
   function formatOffset(offset, reference) {
     if (!Number.isFinite(offset)) return null;
-    if (offset === 0) return reference === 'Essen' ? 'zum Essen' : 'zum Bolus';
+    if (offset === 0) return reference === 'Essen' ? 'zum Essen' : 'zum letzten Bolus';
     return `${formatNumber(Math.abs(offset), 0)} min ${offset < 0 ? 'vor' : 'nach'} ${reference}`;
   }
 
   function formatPeakValue(analysis) {
-    if (!Number.isFinite(analysis.peak)) return '–';
-    return `${formatNumber(analysis.peak, 0)} mg/dl · ${formatNumber(analysis.minutesToPeak, 0)} min`;
+    if (!Number.isFinite(analysis.peak)) return 'nicht bestimmbar';
+    const parts = [`${formatNumber(analysis.peak, 0)} mg/dl`];
+    if (Number.isFinite(analysis.peakFromBolus)) {
+      parts.push(`${formatNumber(analysis.peakFromBolus, 0)} min nach letztem Bolus`);
+    }
+    if (Number.isFinite(analysis.minutesToPeak)) {
+      parts.push(`${formatNumber(analysis.minutesToPeak, 0)} min nach Essen`);
+    }
+    return parts.join(' · ');
   }
 
   function formatBolusValue(analysis) {
-    if (!analysis.bolus) return 'kein passender positiver Bolus gefunden';
-    return `${formatNumber(analysis.bolus[2], 2)} E`;
+    if (!analysis.bolus) return 'kein passender positiver Bolus vor Rückgang gefunden';
+    const parts = [`${formatNumber(analysis.bolus[2], 2)} E`];
+    if (Number.isFinite(analysis.bolusOffset)) {
+      parts.push(formatOffset(analysis.bolusOffset, 'Essen'));
+    }
+    return parts.join(' · ');
   }
 
   function formatTurnValue(analysis) {
     if (!Number.isFinite(analysis.turnMinute)) return 'nicht stabil erkennbar';
-    if (analysis.bolus && Number.isFinite(analysis.turnFromBolus)) {
-      return formatOffset(analysis.turnFromBolus, 'Bolus');
+    const parts = [];
+    if (Number.isFinite(analysis.turnFromBolus)) {
+      parts.push(`${formatNumber(analysis.turnFromBolus, 0)} min nach letztem Bolus`);
     }
-    return formatOffset(analysis.turnFromMeal, 'Essen');
+    if (Number.isFinite(analysis.turnFromMeal)) {
+      parts.push(`${formatNumber(analysis.turnFromMeal, 0)} min nach Essen`);
+    }
+    return parts.join(' · ');
   }
 
   function updateExplanatoryText() {
     const intro = document.querySelector('#meal-analysis article.card.full p.muted');
     if (intro) {
       intro.textContent =
-        'Der 2-h-Peak wird ab dem protokollierten Essensbeginn gemessen, nicht ab der ' +
-        'Bolusabgabe. CGM-Werte bis 180 Minuten dienen nur als Kurvenkontext. Der ' +
-        'anhaltende Rückgangs-Proxy kann frühestens am 2-h-Peak liegen und wird erst ' +
-        'angezeigt, wenn vier weitere zusammenhängende Messwerte über mindestens 15 Minuten ' +
-        `einen Abfall von mindestens ${DECLINE_DROP_MGDL} mg/dl bestätigen und bis zum ` +
-        `Kontextende kein Rebound von mehr als ${DECLINE_REBOUND_TOLERANCE_MGDL} mg/dl folgt. ` +
-        'Das beschreibt nur den CGM-Verlauf und ist kein Nachweis eines Insulin-Wirkbeginns.';
+        'Der Mahlzeiten-Peak ist nicht mehr auf zwei Stunden begrenzt. Bis zu fünf Stunden ' +
+        'nach dem protokollierten Essensbeginn wird zuerst ein anhaltender Rückgangs-Proxy ' +
+        'gesucht. Der Peak ist anschließend der höchste CGM-Wert zwischen dem letzten positiven ' +
+        'Bolus vor diesem Rückgang und dem Rückgang selbst. Kommt vorher ein weiterer Bolus, ' +
+        'setzt er den Peak-Start neu. Eine weitere protokollierte Mahlzeit beendet den Kontext. ' +
+        `Der Rückgang wird mit ${DECLINE_CONFIRMATION_MINUTES} Minuten Hysterese, mindestens ` +
+        `${DECLINE_DROP_MGDL} mg/dl bestätigtem Abfall und maximal ` +
+        `${DECLINE_REBOUND_TOLERANCE_MGDL} mg/dl späterem Rebound abgesichert. ` +
+        'Der separate 2-h-Wert bleibt nur ein Referenzwert. Das ist kein Nachweis eines ' +
+        'pharmakologischen Insulin-Wirkbeginns.';
     }
 
-    const headers = document.querySelectorAll('#food-comparison')
-      .item(0)?.closest('table')?.querySelectorAll('thead th');
+    const headers = document.querySelector('#food-comparison')
+      ?.closest('table')?.querySelectorAll('thead th');
     if (headers?.length >= 6) {
-      headers[3].textContent = '2-h-Peak-Anstieg';
-      headers[4].textContent = 'Zeit bis 2-h-Peak ab Essen';
+      headers[3].textContent = 'Peak-Anstieg';
+      headers[4].textContent = 'Essen→Peak';
+      headers[5].textContent = 'letzter Bolus→Peak';
+      if (headers.length < 7) {
+        const header = document.createElement('th');
+        header.textContent = '2-h-Änderung';
+        headers[0].parentElement.appendChild(header);
+      }
     }
 
     const note = document.querySelector('#food-comparison-note');
     if (note) {
       note.textContent =
-        'Mediane werden nur aus persönlichen, vollständig abgedeckten Ereignissen berechnet. ' +
-        'Der höchste CGM-Wert in den ersten 120 Minuten nach dem protokollierten Essensbeginn ' +
-        'wird als 2-h-Peak verwendet. Ein weiterer protokollierter Essenseintrag beendet den ' +
-        'Kurvenkontext; eine ursächliche Zuordnung zum Lebensmittel ist dennoch nicht bewiesen.';
+        'Mediane werden nur aus persönlichen, vollständig auswertbaren Ereignissen berechnet. ' +
+        'Der Peak darf auch nach mehr als zwei oder drei Stunden liegen, sofern vor dem stabilen ' +
+        'Rückgang keine neue Mahlzeit protokolliert wurde. Bei mehreren Boli zählt jeweils das ' +
+        'Segment ab dem letzten Bolus vor dem Rückgang.';
     }
+  }
+
+  function updateFoodComparisonTable(analyses) {
+    const groups = buildFoodComparisonsAdaptivePeak(analyses);
+    const rows = document.querySelectorAll('#food-comparison tr');
+    rows.forEach((row, index) => {
+      const group = groups[index];
+      if (!group) return;
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 6) return;
+      cells[3].textContent = group.analyzed ? `${formatNumber(group.medianPeakDelta, 0)} mg/dl` : 'wartet auf Daten';
+      cells[4].textContent = group.analyzed ? `${formatNumber(group.medianMinutesToPeak, 0)} min` : '–';
+      cells[5].textContent = group.analyzed ? `${formatNumber(group.medianMinutesBolusToPeak, 0)} min` : '–';
+      if (cells.length < 7) {
+        const cell = document.createElement('td');
+        row.appendChild(cell);
+      }
+      row.cells[6].textContent = group.analyzed && Number.isFinite(group.medianTwoHourDelta)
+        ? `${formatNumber(group.medianTwoHourDelta, 0)} mg/dl`
+        : '–';
+    });
   }
 
   function updateMealCards() {
     if (typeof gcState === 'undefined') return;
-    const analyses = analyzeMealsTwoHourPeak(
+    const analyses = analyzeMealsAdaptivePeak(
       gcState.diary,
       gcState.clinical.cgm,
       gcState.clinical.boluses,
@@ -351,17 +443,15 @@
       const cells = item.querySelectorAll('.analysis-grid > div');
       if (cells.length < 6) return;
 
-      cells[2].querySelector('span').textContent = '2-h-Peak (ab Essen)';
+      cells[2].querySelector('span').textContent = 'Peak nach letztem Bolus vor Rückgang';
       cells[2].querySelector('strong').textContent = formatPeakValue(analysis);
-      cells[4].querySelector('span').textContent = analysis.bolus
-        ? `Boluszuordnung · ${formatOffset(analysis.bolusOffset, 'Essen')}`
-        : 'Boluszuordnung';
+      cells[4].querySelector('span').textContent = 'maßgeblicher letzter Bolus';
       cells[4].querySelector('strong').textContent = formatBolusValue(analysis);
-      cells[5].querySelector('span').textContent = Number.isFinite(analysis.turnMinute)
-        ? `CGM-Wendepunkt-Proxy (anhaltender Rückgang) · ${formatOffset(analysis.turnFromMeal, 'Essen')}`
-        : 'CGM-Wendepunkt-Proxy (anhaltender Rückgang)';
+      cells[5].querySelector('span').textContent = 'CGM-Wendepunkt-Proxy (anhaltender Rückgang)';
       cells[5].querySelector('strong').textContent = formatTurnValue(analysis);
     });
+
+    updateFoodComparisonTable(analyses);
 
     const summaryLabels = document.querySelectorAll('#meal-summary > div > span');
     if (summaryLabels.length >= 4) {
@@ -375,16 +465,16 @@
     const previousMealsView = typeof gcMeals === 'function' ? gcMeals : null;
     const previousQualityView = typeof gcQuality === 'function' ? gcQuality : null;
 
-    if (typeof analyzeMeals !== 'undefined') analyzeMeals = analyzeMealsTwoHourPeak;
+    if (typeof analyzeMeals !== 'undefined') analyzeMeals = analyzeMealsAdaptivePeak;
     if (typeof buildFoodComparisons !== 'undefined') {
-      buildFoodComparisons = buildFoodComparisonsTwoHourPeak;
+      buildFoodComparisons = buildFoodComparisonsAdaptivePeak;
     }
     if (typeof buildRecommendations !== 'undefined') {
-      buildRecommendations = buildRecommendationsTwoHourPeak;
+      buildRecommendations = buildRecommendationsAdaptivePeak;
     }
 
     if (previousMealsView) {
-      gcMeals = function twoHourPeakMealsView() {
+      gcMeals = function adaptivePeakMealsView() {
         previousMealsView();
         updateMealCards();
         updateExplanatoryText();
@@ -392,7 +482,7 @@
     }
 
     if (previousQualityView) {
-      gcQuality = function twoHourPeakQualityView() {
+      gcQuality = function adaptivePeakQualityView() {
         previousQualityView();
         const body = document.querySelector('#quality-body');
         if (!body) return;
@@ -400,14 +490,14 @@
         const peakRow = document.createElement('tr');
         peakRow.innerHTML =
           '<td>Mahlzeiten-Peakfenster</td>' +
-          '<td>0–120 min ab Essen</td>' +
-          '<td>Das Maximum nach 120 Minuten wird nicht als Mahlzeiten-Peak oder Zeit bis Peak verwendet.</td>';
+          '<td>letzter Bolus → Rückgang · max. 5 h</td>' +
+          '<td>Der Peak ist der höchste CGM-Wert nach dem letzten positiven Bolus vor dem stabil bestätigten Rückgang. Ein weiterer Bolus setzt den Start neu; eine neue Mahlzeit beendet den Kontext.</td>';
         body.appendChild(peakRow);
 
         const declineRow = document.createElement('tr');
         declineRow.innerHTML =
           '<td>Anhaltender Rückgangs-Proxy</td>' +
-          `<td>nach 2-h-Peak · ${DECLINE_CONFIRMATION_MINUTES} min Hysterese</td>` +
+          `<td>${DECLINE_CONFIRMATION_MINUTES} min Hysterese</td>` +
           `<td>Vier Folgewerte müssen mindestens ${DECLINE_DROP_MGDL} mg/dl Abfall bestätigen; ` +
           `ein späterer Rebound über ${DECLINE_REBOUND_TOLERANCE_MGDL} mg/dl bis zum Kontextende verwirft den Kandidaten.</td>`;
         body.appendChild(declineRow);
@@ -416,11 +506,13 @@
 
     if (typeof GlucoseCoachV3 !== 'undefined') {
       Object.assign(GlucoseCoachV3, {
-        analyzeMealTwoHourPeak,
-        analyzeMeals: analyzeMealsTwoHourPeak,
-        buildFoodComparisons: buildFoodComparisonsTwoHourPeak,
-        buildRecommendations: buildRecommendationsTwoHourPeak,
-        GC_POSTPRANDIAL_PEAK_MINUTES: PEAK_WINDOW_MINUTES,
+        analyzeMealAdaptivePeak,
+        analyzeMealTwoHourPeak: analyzeMealAdaptivePeak,
+        analyzeMeals: analyzeMealsAdaptivePeak,
+        buildFoodComparisons: buildFoodComparisonsAdaptivePeak,
+        buildRecommendations: buildRecommendationsAdaptivePeak,
+        GC_TWO_HOUR_REFERENCE_MINUTES: TWO_HOUR_REFERENCE_MINUTES,
+        GC_MEAL_CONTEXT_MINUTES: MEAL_CONTEXT_MINUTES,
         GC_DECLINE_CONFIRMATION_MINUTES: DECLINE_CONFIRMATION_MINUTES,
         GC_DECLINE_DROP_MGDL: DECLINE_DROP_MGDL,
         GC_DECLINE_REBOUND_TOLERANCE_MGDL: DECLINE_REBOUND_TOLERANCE_MGDL,
@@ -433,13 +525,14 @@
 
   const api = {
     ...baseApi,
-    analyzeMealTwoHourPeak,
-    analyzeMeals: analyzeMealsTwoHourPeak,
-    buildFoodComparisons: buildFoodComparisonsTwoHourPeak,
-    buildRecommendations: buildRecommendationsTwoHourPeak,
+    analyzeMealAdaptivePeak,
+    analyzeMealTwoHourPeak: analyzeMealAdaptivePeak,
+    analyzeMeals: analyzeMealsAdaptivePeak,
+    buildFoodComparisons: buildFoodComparisonsAdaptivePeak,
+    buildRecommendations: buildRecommendationsAdaptivePeak,
     formatOffset,
-    GC_POSTPRANDIAL_PEAK_MINUTES: PEAK_WINDOW_MINUTES,
-    GC_MEAL_CONTEXT_MINUTES: EXTENDED_CONTEXT_MINUTES,
+    GC_TWO_HOUR_REFERENCE_MINUTES: TWO_HOUR_REFERENCE_MINUTES,
+    GC_MEAL_CONTEXT_MINUTES: MEAL_CONTEXT_MINUTES,
     GC_DECLINE_CONFIRMATION_MINUTES: DECLINE_CONFIRMATION_MINUTES,
     GC_DECLINE_DROP_MGDL: DECLINE_DROP_MGDL,
     GC_DECLINE_REBOUND_TOLERANCE_MGDL: DECLINE_REBOUND_TOLERANCE_MGDL,
