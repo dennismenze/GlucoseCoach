@@ -189,9 +189,9 @@
       minute - BOLUS_LOOKBACK_MINUTES,
       contextEnd,
     );
-    const firstBolus = bolusesInContext[0] || null;
-    const declineSearchStart = firstBolus
-      ? Math.max(minute + 5, firstBolus[0] + 10)
+    const lastBolusInContext = bolusesInContext.at(-1) || null;
+    const declineSearchStart = lastBolusInContext
+      ? Math.max(minute + 5, lastBolusInContext[0] + 10)
       : minute + 5;
     const turn = findSustainedDecline(post, declineSearchStart);
     const bolus = turn
@@ -210,8 +210,7 @@
     if (!bolusesInContext.length) status = 'missing-bolus';
     else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
     else if (!turn) status = 'no-stable-decline';
-    else if (!bolus || !peakRow) status = 'partial-analysis';
-    else if (!two) status = 'partial-analysis';
+    else if (!bolus || !peakRow || !two) status = 'partial-analysis';
     else status = 'complete';
 
     const complete = status === 'complete';
