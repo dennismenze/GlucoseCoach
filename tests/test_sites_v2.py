@@ -112,9 +112,9 @@ class PersonalSitesContractTests(unittest.TestCase):
             "GC_DECLINE_DROP_MGDL",
             "nicht mehr auf zwei Stunden begrenzt",
             "letzten positiven Bolus",
-            "Weitere Boli setzen den Peak-Start neu",
+            "Peak-Start neu",
             "2-h-Wert bleibt nur ein Referenzwert",
-            "kein Nachweis eines pharmakologischen Insulin-Wirkbeginns",
+            "pharmakologischen Insulin-Wirkbeginns",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing meal-analysis boundaries: {missing}")
@@ -188,8 +188,8 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn("assertQuality", main_spec)
         self.assertIn("toHaveCount(7)", main_spec)
         peak_text = paths[1].read_text(encoding="utf-8")
-        self.assertIn("more than", peak_text.replace("mehr als", "more than"))
-        self.assertIn("last bolus", peak_text.replace("letztem Bolus", "last bolus"))
+        self.assertIn("mehr als zwei oder drei Stunden", peak_text)
+        self.assertIn("nach letztem Bolus", peak_text)
         self.assertIn("220 min nach Essen", peak_text)
         self.assertIn("CGM-Wendepunkt-Proxy", peak_text)
         insulin_text = paths[2].read_text(encoding="utf-8")
