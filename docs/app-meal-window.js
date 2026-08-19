@@ -96,6 +96,7 @@
       const nonIncreasingSteps = future
         .map((row, deltaIndex) => row[1] - sequence[deltaIndex][1])
         .filter((delta) => delta <= DECLINE_STEP_TOLERANCE_MGDL).length;
+      const highestConfirmationValue = Math.max(...future.map((row) => row[1]));
       const remaining = rows.slice(index + 1);
       const highestLaterValue = remaining.length
         ? Math.max(...remaining.map((row) => row[1]))
@@ -103,6 +104,7 @@
       const confirmedDrop = candidate[1] - future.at(-1)[1];
 
       if (
+        highestConfirmationValue <= candidate[1] &&
         nonIncreasingSteps >= DECLINE_CONFIRMATION_POINTS - 1 &&
         confirmedDrop >= DECLINE_DROP_MGDL &&
         highestLaterValue <= candidate[1] + DECLINE_REBOUND_TOLERANCE_MGDL
