@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const app = require(path.resolve(__dirname, '..', 'docs', 'app-meal-window.js'));
+const app = require(path.resolve(__dirname, '..', 'docs', 'app-v3.js'));
 const minute = (iso) => Math.round(new Date(iso).getTime() / 60_000);
 
 function mealCurve(when, options) {
@@ -110,6 +110,6 @@ assert(foodCard, 'expected a Hafermilch comparison recommendation');
 assert(foodCard.finding.includes('2-h-Peak-Anstieg'));
 assert(foodCard.finding.includes('ersten 120 Minuten'));
 assert(foodCard.boundary.includes('zeitlich'));
-assert(foodCard.boundary.includes('nicht'));
+assert(foodCard.boundary.includes('keine Dosisempfehlung'));
 
 console.log('Two-hour postprandial peak contract passed');
