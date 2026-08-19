@@ -291,23 +291,22 @@
 
   function formatPeakValue(analysis) {
     if (analysis.peak === undefined || analysis.peak === null) return '–';
-    return `${formatNumber(analysis.peak, 0)} mg/dl · ${formatOffset(analysis.minutesToPeak, 'Essen')}`;
+    return `${formatNumber(analysis.peak, 0)} mg/dl · ${formatNumber(analysis.minutesToPeak, 0)} min`;
   }
 
   function formatBolusValue(analysis) {
     if (!analysis.bolus) return 'kein passender positiver Bolus gefunden';
-    return `${formatNumber(analysis.bolus[2], 2)} E · ${formatOffset(analysis.bolusOffset, 'Essen')}`;
+    return `${formatNumber(analysis.bolus[2], 2)} E`;
   }
 
   function formatTurnValue(analysis) {
     if (analysis.turnMinute === null || analysis.turnMinute === undefined) {
       return 'nicht stabil erkennbar';
     }
-    const parts = [formatOffset(analysis.turnFromMeal, 'Essen')];
     if (analysis.bolus && Number.isFinite(analysis.turnFromBolus)) {
-      parts.push(formatOffset(analysis.turnFromBolus, 'Bolus'));
+      return formatOffset(analysis.turnFromBolus, 'Bolus');
     }
-    return parts.filter(Boolean).join(' · ');
+    return formatOffset(analysis.turnFromMeal, 'Essen');
   }
 
   function updateExplanatoryText() {
@@ -355,10 +354,15 @@
       const cells = item.querySelectorAll('.analysis-grid > div');
       if (cells.length < 6) return;
 
-      cells[2].querySelector('span').textContent = '2-h-Peak';
+      cells[2].querySelector('span').textContent = '2-h-Peak (ab Essen)';
       cells[2].querySelector('strong').textContent = formatPeakValue(analysis);
+      cells[4].querySelector('span').textContent = analysis.bolus
+        ? `Boluszuordnung · ${formatOffset(analysis.bolusOffset, 'Essen')}`
+        : 'Boluszuordnung';
       cells[4].querySelector('strong').textContent = formatBolusValue(analysis);
-      cells[5].querySelector('span').textContent = 'anhaltender Rückgang (Proxy)';
+      cells[5].querySelector('span').textContent = analysis.turnMinute !== null && analysis.turnMinute !== undefined
+        ? `CGM-Wendepunkt-Proxy (anhaltender Rückgang) · ${formatOffset(analysis.turnFromMeal, 'Essen')}`
+        : 'CGM-Wendepunkt-Proxy (anhaltender Rückgang)';
       cells[5].querySelector('strong').textContent = formatTurnValue(analysis);
     });
 
