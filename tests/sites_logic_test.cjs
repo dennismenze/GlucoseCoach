@@ -103,14 +103,13 @@ assert.equal(metrics.veryHigh, 33.33);
 
 const mealMinute = minute('2026-08-17T09:00:00');
 const cgm = [];
-for (let offset = -15; offset <= 180; offset += 5) {
-  let value = 100;
-  if (offset > 0 && offset <= 60) value = 100 + Math.round(offset * 1.3);
-  else if (offset > 60) value = 178 - Math.round((offset - 60) * 0.4);
+for (let offset = -60; offset <= 300; offset += 5) {
+  let value;
+  if (offset <= 0) value = 100;
+  else if (offset <= 190) value = Math.round(100 + (110 * offset) / 190);
+  else value = 210 - Math.round((offset - 190) * 0.75);
   cgm.push([mealMinute + offset, value, 0]);
 }
-// A later value outside the two-hour peak window must not replace the meal peak.
-cgm.find((row) => row[0] === mealMinute + 175)[1] = 250;
 const diary = [{
   id: 'a',
   when: '2026-08-17T09:00',
@@ -118,13 +117,21 @@ const diary = [{
   food: 'Testmahlzeit',
   illness: 'nein',
 }];
-const analyses = meal.analyzeMeals(diary, cgm, [[mealMinute - 10, 46.2, 3.25, 100, 'Bolus']]);
+const analyses = meal.analyzeMeals(
+  diary,
+  cgm,
+  [[mealMinute + 15, 46.2, 3.25, 100, 'Bolus']],
+);
 assert.equal(analyses.length, 1);
 assert.equal(analyses[0].complete, true);
 assert.equal(analyses[0].baseline, 100);
-assert.equal(analyses[0].peak, 178);
-assert.equal(analyses[0].minutesToPeak, 60);
-assert(analyses[0].turnMinute === null || analyses[0].turnMinute >= analyses[0].minute + analyses[0].minutesToPeak);
+assert.equal(analyses[0].peak, 210);
+assert.equal(analyses[0].minutesToPeak, 190);
+assert.equal(analyses[0].peakFromBolus, 175);
+assert.equal(analyses[0].turnFromMeal, 190);
+assert.equal(analyses[0].turnFromBolus, 175);
+assert.equal(meal.GC_MEAL_CONTEXT_MINUTES, 300);
+assert.equal(meal.GC_TWO_HOUR_REFERENCE_MINUTES, 120);
 
 const emptyCards = core.buildRecommendations({
   diary: [], analyses: [], foodGroups: [], cgmRows: [], metrics: null,
@@ -143,4 +150,4 @@ assert.equal(merged.clinical.basalEvents.length, 1);
 assert.equal(merged.clinical.manualGlucose.length, 1);
 assert.equal(merged.clinical.alarms.length, 1);
 
-console.log('GlucoseCoach personal-local importer and meal contracts passed');
+console.log('GlucoseCoach personal-local importer and adaptive meal contracts passed');
