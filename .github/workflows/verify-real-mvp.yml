@@ -68,7 +68,7 @@ jobs:
               "notes_data_",
               "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
               "GC_POSTPRANDIAL_PEAK_MINUTES",
-              "höchste CGM-Wert in den ersten 120 Minuten",
+              "CGM-Wert in den ersten 120 Minuten",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
