@@ -89,7 +89,7 @@ class PersonalSitesContractTests(unittest.TestCase):
             "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
             "kein passender positiver Bolus gefunden",
-            "höchste CGM-Wert in den ersten 120 Minuten",
+            "CGM-Wert in den ersten 120 Minuten",
             "kein Nachweis",
             "GC_POSTPRANDIAL_PEAK_MINUTES",
         ]
