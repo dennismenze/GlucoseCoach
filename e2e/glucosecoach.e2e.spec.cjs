@@ -22,8 +22,6 @@ const WINDOW_VALUES = ['7', '14', '30', '90', 'all'];
 
 function filePayload(file) {
   let content = file.content;
-  // The synthetic note text deliberately contains commas. Encode that field
-  // as valid CSV instead of accidentally testing a malformed fixture.
   if (file.name.startsWith('notes_data_')) {
     const lines = content.split('\n');
     content = lines.map((line, index) => {
@@ -87,10 +85,26 @@ async function expectGridValue(item, label, expected) {
   await expect(cell.locator('strong')).toHaveText(String(expected));
 }
 
+function expectedPeakText(analysis) {
+  if (!Number.isFinite(analysis.peak)) return 'nicht bestimmbar';
+  return `${mg(analysis.peak)} · ${mins(analysis.peakFromBolus)} nach letztem Bolus · ${mins(analysis.minutesToPeak)} nach Essen`;
+}
+
+function expectedBolusText(analysis) {
+  if (!analysis.bolus) return 'kein passender positiver Bolus vor Rückgang gefunden';
+  const offset = analysis.bolusOffset === 0
+    ? 'zum Essen'
+    : `${mins(Math.abs(analysis.bolusOffset))} ${analysis.bolusOffset < 0 ? 'vor' : 'nach'} Essen`;
+  return `${fmt(analysis.bolus[2], 2)} E · ${offset}`;
+}
+
+function expectedTurnText(analysis) {
+  if (!Number.isFinite(analysis.turnMinute)) return 'nicht stabil erkennbar';
+  return `${mins(analysis.turnFromBolus)} nach letztem Bolus · ${mins(analysis.turnFromMeal)} nach Essen`;
+}
+
 async function addDiaryEntriesThroughUi(page, entries) {
   for (const entry of entries) {
-    // The real form uses step="0.25" for sleep. Keep randomized values valid
-    // so the browser's native constraint validation does not block submit.
     entry.sleep = String(Math.round(Number(entry.sleep) * 4) / 4);
     await clickTab(page, 'diary');
     await page.locator('#when').fill(entry.when);
@@ -227,10 +241,10 @@ async function assertMealAnalysis(page, fixture) {
     await expect(item.locator('.status')).toHaveText(expected.complete ? 'vollständig' : expected.status === 'missing-cgm' ? 'wartet auf CSV' : 'teilweise');
     await expectGridValue(item, 'Ausgangswert', mg(expected.baseline));
     await expectGridValue(item, 'erster nachhaltiger Anstieg', mins(expected.minutesToRise));
-    await expectGridValue(item, 'Peak', expected.peak === undefined ? '–' : `${mg(expected.peak)} · ${mins(expected.minutesToPeak)}`);
+    await expectGridValue(item, 'Peak nach letztem Bolus', expectedPeakText(expected));
     await expectGridValue(item, '2-h-Wert', mg(expected.twoHour));
-    await expectGridValue(item, 'Boluszuordnung', expected.bolus ? `${fmt(expected.bolus[2], 2)} E` : 'kein passender positiver Bolus gefunden');
-    await expectGridValue(item, 'CGM-Wendepunkt-Proxy', expected.turnMinute !== null ? `${mins(expected.turnFromBolus)} nach Bolus` : 'nicht bestimmbar');
+    await expectGridValue(item, 'maßgeblicher letzter Bolus', expectedBolusText(expected));
+    await expectGridValue(item, 'CGM-Wendepunkt-Proxy', expectedTurnText(expected));
   }
 
   const tableRows = page.locator('#food-comparison tr');
@@ -242,8 +256,9 @@ async function assertMealAnalysis(page, fixture) {
       String(group.entries),
       String(group.analyzed),
       group.analyzed ? mg(group.medianPeakDelta) : 'wartet auf Daten',
-      mins(group.medianMinutesToPeak),
-      mg(group.medianTwoHourDelta),
+      group.analyzed ? mins(group.medianMinutesToPeak) : '–',
+      group.analyzed ? mins(group.medianMinutesBolusToPeak) : '–',
+      group.analyzed ? mg(group.medianTwoHourDelta) : '–',
     ]);
   }
 
@@ -253,7 +268,7 @@ async function assertMealAnalysis(page, fixture) {
 
   await expect(page.locator('#meal-summary strong')).toHaveCount(4);
   await expect(page.locator('#meal-events .analysis-grid strong')).toHaveCount(analyses.length * 6);
-  await expect(page.locator('#food-comparison td:not(:first-child)')).toHaveCount(groups.length * 5);
+  await expect(page.locator('#food-comparison td:not(:first-child)')).toHaveCount(groups.length * 6);
   await expect(page.locator('#illness-comparison strong')).toHaveCount(3);
 }
 
@@ -308,6 +323,9 @@ async function assertQuality(page, fixture) {
 
   const diaryRow = rows.filter({ hasText: 'Tagebuch-Zuordnung' });
   await expect(diaryRow.locator('td').nth(1)).toHaveText(`${completeMeals} vollständig`);
+
+  const peakRow = rows.filter({ hasText: 'Mahlzeiten-Peakfenster' });
+  await expect(peakRow.locator('td').nth(1)).toHaveText('letzter Bolus → Rückgang · max. 5 h');
 }
 
 async function runScenario(page, fixture) {
@@ -320,7 +338,8 @@ async function runScenario(page, fixture) {
 
   await page.goto('/');
   await expect(page.locator('.import-drop p').first()).toContainText('Kompletter Omnipod-Export');
-  await expect(page.locator('nav button')).toHaveCount(6);
+  await expect(page.locator('nav button')).toHaveCount(7);
+  await expect(page.locator('nav button[data-panel="insulin-action"]')).toHaveText('Insulinwirkung');
 
   await addDiaryEntriesThroughUi(page, fixture.diary);
   await clickTab(page, 'import-data');
