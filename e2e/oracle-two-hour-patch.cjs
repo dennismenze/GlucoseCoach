@@ -68,11 +68,13 @@ function sustainedDecline(rows, earliestMinute) {
     const nonIncreasing = future
       .map((row, deltaIndex) => row[1] - sequence[deltaIndex][1])
       .filter((delta) => delta <= STEP_TOLERANCE_MGDL).length;
+    const highestConfirmation = Math.max(...future.map((row) => row[1]));
     const remaining = rows.slice(index + 1);
     const highestLater = remaining.length
       ? Math.max(...remaining.map((row) => row[1]))
       : candidate[1];
     if (
+      highestConfirmation <= candidate[1] &&
       nonIncreasing >= CONFIRMATION_POINTS - 1 &&
       candidate[1] - future.at(-1)[1] >= DROP_MGDL &&
       highestLater <= candidate[1] + REBOUND_TOLERANCE_MGDL
