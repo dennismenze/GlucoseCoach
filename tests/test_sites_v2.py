@@ -12,7 +12,10 @@ CORE = (ROOT / "docs" / "app-v3-core.js").read_text(encoding="utf-8")
 IMPORTERS = (ROOT / "docs" / "app-importers.js").read_text(encoding="utf-8")
 CONTEXT_IMPORTERS = (ROOT / "docs" / "app-importers-context.js").read_text(encoding="utf-8")
 UI_CONTRACT = (ROOT / "docs" / "app-ui-contract.js").read_text(encoding="utf-8")
-BUNDLE = "\n".join((HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT))
+MEAL_WINDOW = (ROOT / "docs" / "app-meal-window.js").read_text(encoding="utf-8")
+BUNDLE = "\n".join(
+    (HTML, LOADER, CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW)
+)
 
 
 class PersonalSitesContractTests(unittest.TestCase):
@@ -86,6 +89,9 @@ class PersonalSitesContractTests(unittest.TestCase):
             "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
             "kein passender positiver Bolus gefunden",
+            "höchste CGM-Wert in den ersten 120 Minuten",
+            "kein Nachweis",
+            "GC_POSTPRANDIAL_PEAK_MINUTES",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing analysis boundaries: {missing}")
@@ -95,19 +101,27 @@ class PersonalSitesContractTests(unittest.TestCase):
 
     def test_loader_keeps_personal_bundle_modular(self) -> None:
         self.assertIn('<script src="app-v3.js"></script>', HTML)
-        for module in ("app-v3-core.js", "app-importers.js", "app-importers-context.js", "app-ui-contract.js"):
+        modules = (
+            "app-v3-core.js",
+            "app-importers.js",
+            "app-importers-context.js",
+            "app-ui-contract.js",
+            "app-meal-window.js",
+        )
+        for module in modules:
             self.assertIn(module, LOADER)
         for legacy in ("app-core.js", "app-analysis.js", "app-render.js", "app-events.js"):
             self.assertNotIn(f'<script src="{legacy}"></script>', HTML)
-        for source in (CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT):
+        for source in (CORE, IMPORTERS, CONTEXT_IMPORTERS, UI_CONTRACT, MEAL_WINDOW):
             self.assertIn("module.exports", source)
 
     def test_e2e_contract_is_present(self) -> None:
         spec = ROOT / "e2e" / "glucosecoach.e2e.spec.cjs"
+        peak_spec = ROOT / "e2e" / "postprandial-peak.e2e.spec.cjs"
         oracle = ROOT / "e2e" / "oracle.cjs"
         config = ROOT / "playwright.config.cjs"
         workflow = ROOT / ".github" / "workflows" / "e2e.yml"
-        for path in (spec, oracle, config, workflow):
+        for path in (spec, peak_spec, oracle, config, workflow):
             self.assertTrue(path.is_file(), f"missing E2E artifact: {path.relative_to(ROOT)}")
         spec_text = spec.read_text(encoding="utf-8")
         self.assertIn("SEEDS", spec_text)
@@ -115,6 +129,10 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn("assertStoredData", spec_text)
         self.assertIn("assertMealAnalysis", spec_text)
         self.assertIn("assertQuality", spec_text)
+        peak_text = peak_spec.read_text(encoding="utf-8")
+        self.assertIn("latePeak", peak_text)
+        self.assertIn("2-h-Peak", peak_text)
+        self.assertIn("0–120 Minuten", peak_text)
 
     def test_node_logic_suite(self) -> None:
         subprocess.run(
