@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js; do
+          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js docs/app-meal-window.js; do
             test -s "$file"
           done
           python - <<'PY'
@@ -39,6 +39,7 @@ jobs:
               "docs/app-importers.js",
               "docs/app-importers-context.js",
               "docs/app-ui-contract.js",
+              "docs/app-meal-window.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
@@ -54,6 +55,7 @@ jobs:
               "app-importers.js",
               "app-importers-context.js",
               "app-ui-contract.js",
+              "app-meal-window.js",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
@@ -65,6 +67,8 @@ jobs:
               "medication_data_",
               "notes_data_",
               "SUPPORTED_OMNIPOD_TYPE_COUNT = 12",
+              "GC_POSTPRANDIAL_PEAK_MINUTES",
+              "höchste CGM-Wert in den ersten 120 Minuten",
           ]
           forbidden = [
               "25.382", "25382", "138.5", "6.62", "82.22", "16.55",
@@ -84,8 +88,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check docs/app-meal-window.js
+          node --check tests/postprandial_peak_test.cjs
           node --check e2e/oracle.cjs
           node --check e2e/glucosecoach.e2e.spec.cjs
+          node --check e2e/postprandial-peak.e2e.spec.cjs
           node --check playwright.config.cjs
 
       - name: Run repository validator
