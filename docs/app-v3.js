@@ -8,6 +8,7 @@
         ...require('./app-importers.js'),
         ...require('./app-importers-context.js'),
         ...require('./app-ui-contract.js'),
+        ...require('./app-meal-window.js'),
       };
     }
     return;
@@ -27,7 +28,9 @@
 
   loadScript('app-v3-core.js', () =>
     loadScript('app-importers.js', () =>
-      loadScript('app-importers-context.js', () => loadScript('app-ui-contract.js')),
+      loadScript('app-importers-context.js', () =>
+        loadScript('app-ui-contract.js', () => loadScript('app-meal-window.js')),
+      ),
     ),
   );
 })();
