@@ -1,3 +1,5 @@
+require('./e2e/oracle-two-hour-patch.cjs');
+
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
