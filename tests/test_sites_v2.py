@@ -106,12 +106,15 @@ class PersonalSitesContractTests(unittest.TestCase):
             "CGM-Wendepunkt-Proxy",
             "kein direkter pharmakologischer Wirkeintritt",
             "Keine Diagnose, keine automatische Insulindosierung",
-            "kein passender positiver Bolus gefunden",
-            "höchste CGM-Wert in den ersten 120 Minuten",
-            "kein Nachweis eines Insulin-Wirkbeginns",
-            "GC_POSTPRANDIAL_PEAK_MINUTES",
+            "GC_TWO_HOUR_REFERENCE_MINUTES",
+            "GC_MEAL_CONTEXT_MINUTES",
             "GC_DECLINE_CONFIRMATION_MINUTES",
             "GC_DECLINE_DROP_MGDL",
+            "nicht mehr auf zwei Stunden begrenzt",
+            "letzten positiven Bolus",
+            "Weitere Boli setzen den Peak-Start neu",
+            "2-h-Wert bleibt nur ein Referenzwert",
+            "kein Nachweis eines pharmakologischen Insulin-Wirkbeginns",
         ]
         missing = [value for value in required if value not in BUNDLE]
         self.assertFalse(missing, f"missing meal-analysis boundaries: {missing}")
@@ -183,8 +186,11 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn("assertStoredData", main_spec)
         self.assertIn("assertMealAnalysis", main_spec)
         self.assertIn("assertQuality", main_spec)
+        self.assertIn("toHaveCount(7)", main_spec)
         peak_text = paths[1].read_text(encoding="utf-8")
-        self.assertIn("latePeak", peak_text)
+        self.assertIn("more than", peak_text.replace("mehr als", "more than"))
+        self.assertIn("last bolus", peak_text.replace("letztem Bolus", "last bolus"))
+        self.assertIn("220 min nach Essen", peak_text)
         self.assertIn("CGM-Wendepunkt-Proxy", peak_text)
         insulin_text = paths[2].read_text(encoding="utf-8")
         self.assertIn("assertEveryDisplayedInsulinNumber", insulin_text)
