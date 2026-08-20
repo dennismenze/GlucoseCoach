@@ -33,6 +33,24 @@
     document.head.appendChild(script);
   }
 
+  function ensureLegacyBindStubs() {
+    if (document.querySelector('#legacy-json-bind-stubs')) return;
+    const container = document.createElement('div');
+    container.id = 'legacy-json-bind-stubs';
+    container.hidden = true;
+    container.setAttribute('aria-hidden', 'true');
+    container.innerHTML = `
+      <button type="button" id="export-diary"></button>
+      <input type="file" id="import-diary">
+      <input type="file" id="import-all">`;
+    document.body.appendChild(container);
+  }
+
+  function removeLegacyBindStubs() {
+    document.querySelector('#legacy-json-bind-stubs')?.remove();
+  }
+
+  ensureLegacyBindStubs();
   loadScript('app-v3-core.js', () =>
     loadScript('app-importers.js', () =>
       loadScript('app-importers-context.js', () =>
@@ -42,7 +60,9 @@
               loadScript('app-export-core.js', () =>
                 loadScript('app-export-ui.js', () =>
                   loadScript('app-insulin-summary-core.js', () =>
-                    loadScript('app-insulin-summary-ui.js'),
+                    loadScript('app-insulin-summary-ui.js', () =>
+                      loadScript('app-meal-list-ui.js', removeLegacyBindStubs),
+                    ),
                   ),
                 ),
               ),
