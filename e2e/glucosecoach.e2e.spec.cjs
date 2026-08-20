@@ -87,20 +87,24 @@ async function expectGridValue(item, label, expected) {
 
 function expectedPeakText(analysis) {
   if (!Number.isFinite(analysis.peak)) return 'nicht bestimmbar';
-  return `${mg(analysis.peak)} · ${mins(analysis.peakFromBolus)} nach letztem Bolus · ${mins(analysis.minutesToPeak)} nach Essen`;
+  return `${mg(analysis.peak)} · ${mins(analysis.peakFromBolus)} nach Mahlzeitenbolus · ${mins(analysis.minutesToPeak)} nach Essen`;
 }
 
 function expectedBolusText(analysis) {
-  if (!analysis.bolus) return 'kein passender positiver Bolus vor Rückgang gefunden';
+  if (!analysis.bolus) return 'kein mahlzeitennaher positiver Bolus (±60 min) gefunden';
   const offset = analysis.bolusOffset === 0
     ? 'zum Essen'
     : `${mins(Math.abs(analysis.bolusOffset))} ${analysis.bolusOffset < 0 ? 'vor' : 'nach'} Essen`;
-  return `${fmt(analysis.bolus[2], 2)} E · ${offset}`;
+  const ignored = Number(analysis.ignoredBolusCountBeforeTurn || 0);
+  const correctionText = ignored > 0
+    ? ` · ${ignored} spätere ${ignored === 1 ? 'Bolusgabe' : 'Bolusgaben'} vor dem Wendepunkt als mögliche ${ignored === 1 ? 'Korrektur' : 'Korrekturen'} behandelt`
+    : '';
+  return `${fmt(analysis.bolus[2], 2)} E · ${offset}${correctionText}`;
 }
 
 function expectedTurnText(analysis) {
   if (!Number.isFinite(analysis.turnMinute)) return 'nicht stabil erkennbar';
-  return `${mins(analysis.turnFromBolus)} nach letztem Bolus · ${mins(analysis.turnFromMeal)} nach Essen`;
+  return `${mins(analysis.turnFromBolus)} nach Mahlzeitenbolus · ${mins(analysis.turnFromMeal)} nach Essen`;
 }
 
 async function addDiaryEntriesThroughUi(page, entries) {
@@ -241,9 +245,9 @@ async function assertMealAnalysis(page, fixture) {
     await expect(item.locator('.status')).toHaveText(expected.complete ? 'vollständig' : expected.status === 'missing-cgm' ? 'wartet auf CSV' : 'teilweise');
     await expectGridValue(item, 'Ausgangswert', mg(expected.baseline));
     await expectGridValue(item, 'erster nachhaltiger Anstieg', mins(expected.minutesToRise));
-    await expectGridValue(item, 'Peak nach letztem Bolus', expectedPeakText(expected));
+    await expectGridValue(item, 'Peak nach Mahlzeitenbolus', expectedPeakText(expected));
     await expectGridValue(item, '2-h-Wert', mg(expected.twoHour));
-    await expectGridValue(item, 'maßgeblicher letzter Bolus', expectedBolusText(expected));
+    await expectGridValue(item, 'maßgeblicher Mahlzeitenbolus', expectedBolusText(expected));
     await expectGridValue(item, 'CGM-Wendepunkt-Proxy', expectedTurnText(expected));
   }
 
@@ -325,7 +329,7 @@ async function assertQuality(page, fixture) {
   await expect(diaryRow.locator('td').nth(1)).toHaveText(`${completeMeals} vollständig`);
 
   const peakRow = rows.filter({ hasText: 'Mahlzeiten-Peakfenster' });
-  await expect(peakRow.locator('td').nth(1)).toHaveText('letzter Bolus → Rückgang · max. 5 h');
+  await expect(peakRow.locator('td').nth(1)).toHaveText('Mahlzeitenbolus → Rückgang · max. 5 h');
 }
 
 async function runScenario(page, fixture) {

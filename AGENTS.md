@@ -67,6 +67,15 @@ Für `Insulinwirkung` gilt zusätzlich:
 - Mahlzeitenboli dürfen nicht in die aggregierte persönliche Wirkzeit eingehen;
 - zensierte Ereignisse und Unsicherheitsangaben dürfen nicht stillschweigend entfernt werden.
 
+Für den Mahlzeiten-Peak müssen fokussierte Fixtures mindestens abdecken:
+
+- einen zugeordneten Mahlzeitenbolus im Bereich von ±60 Minuten um den Tagebucheintrag;
+- einen späteren Korrekturbolus während der noch steigenden Kurve;
+- einen weiteren Bolus nach dem eigentlichen Peak bzw. Wendepunkt;
+- den Nachweis, dass beide späteren Boli den Mahlzeitenbolus und den Peak-Start nicht ersetzen;
+- einen explizit als Korrektur gekennzeichneten Bolus ohne Mahlzeitenbolus, der keine vollständige Mahlzeitenanalyse erzeugen darf;
+- einen Bolus außerhalb des Zuordnungsfensters, der nicht rückwirkend als Mahlzeitenbolus verwendet werden darf.
+
 Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constraints wie `step`, `min` und `max` einzuhalten und CSV-Felder mit Trennzeichen korrekt zu quoten. Ein Test soll nicht wegen absichtlich oder versehentlich ungültiger Fixture-Daten fehlschlagen, außer genau diese Validierung wird getestet.
 
 ## Verbindlicher Mahlzeiten-Peak-Vertrag
@@ -74,14 +83,17 @@ Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constr
 Der Mahlzeiten-Peak ist **nicht** auf 120 Minuten begrenzt. Fett- und proteinreiche Mahlzeiten können einen deutlich späteren Glukoseanstieg zeigen; deshalb gilt für die Implementierung:
 
 - der Mahlzeitenkontext reicht bis zu 300 Minuten nach dem protokollierten Essensbeginn, endet aber früher bei einer neuen protokollierten Mahlzeit;
-- zuerst wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
-- bei mehreren positiven Boli innerhalb des Mahlzeitenkontexts wird die Rückgangssuche nach dem **letzten** Bolus neu gestartet;
-- der maßgebliche Peak ist der höchste CGM-Wert zwischen diesem letzten positiven Bolus und dem anschließend stabil bestätigten Rückgang;
-- ein früherer, auch höherer Peak vor einem späteren Bolus gehört nicht mehr zum maßgeblichen letzten Bolussegment;
-- der 2-h-Wert bleibt als separater Referenzwert erhalten, ist aber nicht mehr die Peak-Grenze;
-- ohne positiven Bolus oder ohne stabil bestätigten Rückgang darf kein endgültiger bolusbezogener Mahlzeiten-Peak behauptet werden;
+- als Mahlzeitenbolus kommt nur ein positiver Bolus im Bereich von 60 Minuten vor bis 60 Minuten nach dem protokollierten Essensbeginn infrage;
+- bei mehreren Kandidaten werden Einträge mit positiver Kohlenhydratangabe und ohne Korrekturkennzeichnung bevorzugt; vorhandene Tagebuch-Kohlenhydrate dürfen zur plausiblen Zuordnung verwendet werden;
+- ein ausschließlich als `Korrektur` bzw. `Correction` gekennzeichneter Bolus ohne Kohlenhydratangabe darf nicht als Mahlzeitenbolus verwendet werden;
+- ausgehend vom zugeordneten Mahlzeitenbolus wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
+- der maßgebliche Peak ist der höchste CGM-Wert zwischen diesem Mahlzeitenbolus und dem anschließend stabil bestätigten Rückgang;
+- weitere positive Boli ohne neue protokollierte Mahlzeit starten weder die Peak-Suche noch die Wendepunktsuche neu; Boli nach dem Mahlzeitenbolus und vor dem Wendepunkt werden als mögliche Korrekturen ausgewiesen;
+- solche späteren Boli bleiben Störvariablen und können den beobachteten CGM-Verlauf beeinflussen; das Ignorieren als Peak-Anker bedeutet nicht, dass ihre Wirkung rechnerisch entfernt wurde;
+- der 2-h-Wert bleibt als separater Referenzwert erhalten, ist aber nicht die Peak-Grenze;
+- ohne zugeordneten Mahlzeitenbolus oder ohne stabil bestätigten Rückgang darf kein endgültiger bolusbezogener Mahlzeiten-Peak behauptet werden;
 - eine weitere protokollierte Mahlzeit beendet die Zuordnung und kann die vorherige Analyse unvollständig machen;
-- die UI muss Zeitabstände sowohl relativ zum Essen als auch relativ zum maßgeblichen letzten Bolus eindeutig benennen.
+- die UI muss Zeitabstände sowohl relativ zum Essen als auch relativ zum zugeordneten Mahlzeitenbolus eindeutig benennen.
 
 Die Hysterese darf nicht durch einen einzelnen gleichen oder niedrigeren CGM-Wert ausgelöst werden. Der aktuelle Vertrag verlangt vier zusammenhängende Folgewerte über rund 20 Minuten, mindestens 8 mg/dl bestätigten Abfall und verwirft einen Kandidaten bei einem späteren Rebound von mehr als 3 mg/dl im verbleibenden Kontext.
 

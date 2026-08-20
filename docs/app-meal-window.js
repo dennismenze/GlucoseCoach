@@ -4,6 +4,7 @@
   const TWO_HOUR_REFERENCE_MINUTES = 120;
   const MEAL_CONTEXT_MINUTES = 300;
   const BOLUS_LOOKBACK_MINUTES = 60;
+  const MEAL_BOLUS_ASSOCIATION_MINUTES = 60;
   const DECLINE_CONFIRMATION_POINTS = 4;
   const DECLINE_CONFIRMATION_MINUTES = 20;
   const DECLINE_MAX_POINT_GAP_MINUTES = 7;
@@ -37,6 +38,12 @@
     return Number.isNaN(date.getTime()) ? null : Math.round(date.getTime() / MINUTE_MS);
   }
 
+  function numberOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(String(value).replace(',', '.'));
+    return Number.isFinite(number) ? number : null;
+  }
+
   function round(value, digits = 2) {
     if (!Number.isFinite(value)) return null;
     const factor = 10 ** digits;
@@ -62,6 +69,38 @@
       .filter((row) => Number.isFinite(Number(row?.[0])))
       .filter((row) => row[0] >= start && row[0] <= end && Number(row[2]) > 0)
       .sort((a, b) => a[0] - b[0]);
+  }
+
+  function isExplicitCorrectionBolus(row) {
+    return /korrektur|correction/i.test(String(row?.[4] ?? ''));
+  }
+
+  function selectMealBolus(entry, boluses, minute, contextEnd = minute + MEAL_CONTEXT_MINUTES) {
+    const candidates = positiveBoluses(
+      boluses,
+      minute - BOLUS_LOOKBACK_MINUTES,
+      Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+    );
+    if (!candidates.length) return null;
+
+    const carbohydrateCandidates = candidates.filter((row) => Number(row[1]) > 0);
+    const nonCorrectionCandidates = candidates.filter((row) => !isExplicitCorrectionBolus(row));
+    const pool = carbohydrateCandidates.length
+      ? carbohydrateCandidates
+      : nonCorrectionCandidates;
+    if (!pool.length) return null;
+
+    const diaryCarbs = numberOrNull(entry?.carbs);
+    return [...pool].sort((a, b) => {
+      if (carbohydrateCandidates.length && diaryCarbs !== null) {
+        const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
+          Math.abs(Number(b[1]) - diaryCarbs);
+        if (carbohydrateDistance !== 0) return carbohydrateDistance;
+      }
+      const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
+      if (timeDistance !== 0) return timeDistance;
+      return a[0] - b[0];
+    })[0] || null;
   }
 
   function contiguousConfirmation(rows, startIndex) {
@@ -191,14 +230,22 @@
       minute - BOLUS_LOOKBACK_MINUTES,
       contextEnd,
     );
-    const lastBolusInContext = bolusesInContext.at(-1) || null;
-    const declineSearchStart = lastBolusInContext
-      ? Math.max(minute + 5, lastBolusInContext[0] + 10)
+    const mealBolusCandidates = positiveBoluses(
+      boluses,
+      minute - BOLUS_LOOKBACK_MINUTES,
+      Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+    );
+    const bolus = selectMealBolus(entry, boluses, minute, contextEnd);
+    const declineSearchStart = bolus
+      ? Math.max(minute + 5, bolus[0] + 10)
       : minute + 5;
-    const turn = findSustainedDecline(post, declineSearchStart);
-    const bolus = turn
-      ? [...bolusesInContext].filter((row) => row[0] <= turn[0]).at(-1) || null
-      : null;
+    const turn = bolus ? findSustainedDecline(post, declineSearchStart) : null;
+    const bolusesBeforeTurn = turn
+      ? bolusesInContext.filter((row) => row[0] <= turn[0])
+      : [];
+    const ignoredBolusesBeforeTurn = bolus
+      ? bolusesBeforeTurn.filter((row) => row[0] > bolus[0])
+      : [];
 
     const peakRows = turn && bolus
       ? windowRows.filter((row) => row[0] >= bolus[0] && row[0] <= turn[0])
@@ -209,10 +256,10 @@
     const bolusStartRow = bolus ? closest(windowRows, bolus[0]) : null;
 
     let status = 'partial-analysis';
-    if (!bolusesInContext.length) status = 'missing-bolus';
+    if (!bolus) status = bolusesInContext.length ? 'missing-meal-bolus' : 'missing-bolus';
     else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
     else if (!turn) status = 'no-stable-decline';
-    else if (!bolus || !peakRow || !two) status = 'partial-analysis';
+    else if (!peakRow || !two) status = 'partial-analysis';
     else status = 'complete';
 
     const complete = status === 'complete';
@@ -234,10 +281,11 @@
       twoHour: two?.[1] ?? null,
       twoHourDelta: two ? two[1] - baseline : null,
       bolus,
+      mealBolus: bolus,
       bolusOffset: bolus ? bolus[0] - minute : null,
-      bolusCountBeforeTurn: turn
-        ? bolusesInContext.filter((row) => row[0] <= turn[0]).length
-        : 0,
+      mealBolusCandidateCount: mealBolusCandidates.length,
+      bolusCountBeforeTurn: bolusesBeforeTurn.length,
+      ignoredBolusCountBeforeTurn: ignoredBolusesBeforeTurn.length,
       turnMinute: turn?.[0] ?? null,
       turnFromMeal: turn ? turn[0] - minute : null,
       turnFromBolus: turn && bolus ? turn[0] - bolus[0] : null,
@@ -246,6 +294,7 @@
       contextEnd,
       truncatedByNextMeal,
       mealContextMinutes: MEAL_CONTEXT_MINUTES,
+      mealBolusAssociationMinutes: MEAL_BOLUS_ASSOCIATION_MINUTES,
     };
   }
 
@@ -315,12 +364,13 @@
         finding:
           `${group.analyzed} Wiederholungen zeigen im Median einen Peak-Anstieg von ` +
           `${group.medianPeakDelta ?? '–'} mg/dl nach ${group.medianMinutesToPeak ?? '–'} min ` +
-          `ab Essen und ${group.medianMinutesBolusToPeak ?? '–'} min nach dem letzten Bolus ` +
+          `ab Essen und ${group.medianMinutesBolusToPeak ?? '–'} min nach dem Mahlzeitenbolus ` +
           'vor dem anhaltenden Rückgang.',
         boundary:
-          'Der Peak ist der höchste persönliche CGM-Wert zwischen dem letzten positiven Bolus ' +
-          'vor dem stabil bestätigten Rückgang und diesem Rückgang. Weitere Boli setzen den ' +
-          'Peak-Start neu; eine neue protokollierte Mahlzeit beendet den Kontext. Das ist ' +
+          'Der Peak ist der höchste persönliche CGM-Wert zwischen dem mahlzeitennahen ' +
+          'positiven Bolus und dem stabil bestätigten Rückgang. Weitere positive Boli ohne ' +
+          'neue protokollierte Mahlzeit starten den Peak nicht neu und werden als mögliche ' +
+          'Korrekturen behandelt. Sie können den CGM-Verlauf trotzdem beeinflussen. Das ist ' +
           'beobachtend und keine Dosisempfehlung.',
       };
     });
@@ -332,7 +382,7 @@
 
   function formatOffset(offset, reference) {
     if (!Number.isFinite(offset)) return null;
-    if (offset === 0) return reference === 'Essen' ? 'zum Essen' : 'zum letzten Bolus';
+    if (offset === 0) return reference === 'Essen' ? 'zum Essen' : `zum ${reference}`;
     return `${formatNumber(Math.abs(offset), 0)} min ${offset < 0 ? 'vor' : 'nach'} ${reference}`;
   }
 
@@ -340,7 +390,7 @@
     if (!Number.isFinite(analysis.peak)) return 'nicht bestimmbar';
     const parts = [`${formatNumber(analysis.peak, 0)} mg/dl`];
     if (Number.isFinite(analysis.peakFromBolus)) {
-      parts.push(`${formatNumber(analysis.peakFromBolus, 0)} min nach letztem Bolus`);
+      parts.push(`${formatNumber(analysis.peakFromBolus, 0)} min nach Mahlzeitenbolus`);
     }
     if (Number.isFinite(analysis.minutesToPeak)) {
       parts.push(`${formatNumber(analysis.minutesToPeak, 0)} min nach Essen`);
@@ -349,10 +399,20 @@
   }
 
   function formatBolusValue(analysis) {
-    if (!analysis.bolus) return 'kein passender positiver Bolus vor Rückgang gefunden';
+    if (!analysis.bolus) {
+      return `kein mahlzeitennaher positiver Bolus (±${MEAL_BOLUS_ASSOCIATION_MINUTES} min) gefunden`;
+    }
     const parts = [`${formatNumber(analysis.bolus[2], 2)} E`];
     if (Number.isFinite(analysis.bolusOffset)) {
       parts.push(formatOffset(analysis.bolusOffset, 'Essen'));
+    }
+    if (analysis.ignoredBolusCountBeforeTurn === 1) {
+      parts.push('1 spätere Bolusgabe vor dem Wendepunkt als mögliche Korrektur behandelt');
+    } else if (analysis.ignoredBolusCountBeforeTurn > 1) {
+      parts.push(
+        `${formatNumber(analysis.ignoredBolusCountBeforeTurn, 0)} spätere Bolusgaben ` +
+        'vor dem Wendepunkt als mögliche Korrekturen behandelt',
+      );
     }
     return parts.join(' · ');
   }
@@ -361,7 +421,7 @@
     if (!Number.isFinite(analysis.turnMinute)) return 'nicht stabil erkennbar';
     const parts = [];
     if (Number.isFinite(analysis.turnFromBolus)) {
-      parts.push(`${formatNumber(analysis.turnFromBolus, 0)} min nach letztem Bolus`);
+      parts.push(`${formatNumber(analysis.turnFromBolus, 0)} min nach Mahlzeitenbolus`);
     }
     if (Number.isFinite(analysis.turnFromMeal)) {
       parts.push(`${formatNumber(analysis.turnFromMeal, 0)} min nach Essen`);
@@ -374,10 +434,14 @@
     if (intro) {
       intro.textContent =
         'Der Mahlzeiten-Peak ist nicht mehr auf zwei Stunden begrenzt. Bis zu fünf Stunden ' +
-        'nach dem protokollierten Essensbeginn wird zuerst ein anhaltender Rückgangs-Proxy ' +
-        'gesucht. Der Peak ist anschließend der höchste CGM-Wert zwischen dem letzten positiven ' +
-        'Bolus vor diesem Rückgang und dem Rückgang selbst. Kommt vorher ein weiterer Bolus, ' +
-        'setzt er den Peak-Start neu. Eine weitere protokollierte Mahlzeit beendet den Kontext. ' +
+        'nach dem protokollierten Essensbeginn wird ein mahlzeitennaher positiver Bolus im ' +
+        `Bereich von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} Minuten zugeordnet. Ein Eintrag mit ` +
+        'Kohlenhydraten und ohne Korrekturkennzeichnung wird bevorzugt. Anschließend wird ein ' +
+        'anhaltender Rückgangs-Proxy gesucht. Der Peak ist der höchste CGM-Wert zwischen diesem ' +
+        'Mahlzeitenbolus und dem Rückgang. Weitere positive Boli ohne neue protokollierte ' +
+        'Mahlzeit starten den Peak nicht neu; sie werden als mögliche Korrekturen behandelt. ' +
+        'Solche Boli können den CGM-Verlauf trotzdem beeinflussen. Eine weitere protokollierte ' +
+        'Mahlzeit beendet den Kontext. ' +
         `Der Rückgang wird mit ${DECLINE_CONFIRMATION_MINUTES} Minuten Hysterese, mindestens ` +
         `${DECLINE_DROP_MGDL} mg/dl bestätigtem Abfall und maximal ` +
         `${DECLINE_REBOUND_TOLERANCE_MGDL} mg/dl späterem Rebound abgesichert. ` +
@@ -390,7 +454,7 @@
     if (headers?.length >= 6) {
       headers[3].textContent = 'Peak-Anstieg';
       headers[4].textContent = 'Essen→Peak';
-      headers[5].textContent = 'letzter Bolus→Peak';
+      headers[5].textContent = 'Mahlzeitenbolus→Peak';
       if (headers.length < 7) {
         const header = document.createElement('th');
         header.textContent = '2-h-Änderung';
@@ -403,8 +467,9 @@
       note.textContent =
         'Mediane werden nur aus persönlichen, vollständig auswertbaren Ereignissen berechnet. ' +
         'Der Peak darf auch nach mehr als zwei oder drei Stunden liegen, sofern vor dem stabilen ' +
-        'Rückgang keine neue Mahlzeit protokolliert wurde. Bei mehreren Boli zählt jeweils das ' +
-        'Segment ab dem letzten Bolus vor dem Rückgang.';
+        'Rückgang keine neue Mahlzeit protokolliert wurde. Spätere Boli ohne neue Mahlzeit ' +
+        'ersetzen den zugeordneten Mahlzeitenbolus nicht; sie bleiben mögliche Störfaktoren ' +
+        'des beobachteten CGM-Verlaufs.';
     }
   }
 
@@ -444,9 +509,9 @@
       const cells = item.querySelectorAll('.analysis-grid > div');
       if (cells.length < 6) return;
 
-      cells[2].querySelector('span').textContent = 'Peak nach letztem Bolus vor Rückgang';
+      cells[2].querySelector('span').textContent = 'Peak nach Mahlzeitenbolus';
       cells[2].querySelector('strong').textContent = formatPeakValue(analysis);
-      cells[4].querySelector('span').textContent = 'maßgeblicher letzter Bolus';
+      cells[4].querySelector('span').textContent = 'maßgeblicher Mahlzeitenbolus';
       cells[4].querySelector('strong').textContent = formatBolusValue(analysis);
       cells[5].querySelector('span').textContent = 'CGM-Wendepunkt-Proxy (anhaltender Rückgang)';
       cells[5].querySelector('strong').textContent = formatTurnValue(analysis);
@@ -491,8 +556,9 @@
         const peakRow = document.createElement('tr');
         peakRow.innerHTML =
           '<td>Mahlzeiten-Peakfenster</td>' +
-          '<td>letzter Bolus → Rückgang · max. 5 h</td>' +
-          '<td>Der Peak ist der höchste CGM-Wert nach dem letzten positiven Bolus vor dem stabil bestätigten Rückgang. Ein weiterer Bolus setzt den Start neu; eine neue Mahlzeit beendet den Kontext.</td>';
+          '<td>Mahlzeitenbolus → Rückgang · max. 5 h</td>' +
+          `<td>Der Peak beginnt beim zugeordneten positiven Bolus innerhalb von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} min um das Essen. ` +
+          'Weitere Boli ohne neue Mahlzeit starten den Peak nicht neu und gelten als mögliche Korrekturen; sie können den CGM-Verlauf dennoch beeinflussen.</td>';
         body.appendChild(peakRow);
 
         const declineRow = document.createElement('tr');
@@ -512,8 +578,10 @@
         analyzeMeals: analyzeMealsAdaptivePeak,
         buildFoodComparisons: buildFoodComparisonsAdaptivePeak,
         buildRecommendations: buildRecommendationsAdaptivePeak,
+        selectMealBolus,
         GC_TWO_HOUR_REFERENCE_MINUTES: TWO_HOUR_REFERENCE_MINUTES,
         GC_MEAL_CONTEXT_MINUTES: MEAL_CONTEXT_MINUTES,
+        GC_MEAL_BOLUS_ASSOCIATION_MINUTES: MEAL_BOLUS_ASSOCIATION_MINUTES,
         GC_DECLINE_CONFIRMATION_MINUTES: DECLINE_CONFIRMATION_MINUTES,
         GC_DECLINE_DROP_MGDL: DECLINE_DROP_MGDL,
         GC_DECLINE_REBOUND_TOLERANCE_MGDL: DECLINE_REBOUND_TOLERANCE_MGDL,
@@ -531,9 +599,11 @@
     analyzeMeals: analyzeMealsAdaptivePeak,
     buildFoodComparisons: buildFoodComparisonsAdaptivePeak,
     buildRecommendations: buildRecommendationsAdaptivePeak,
+    selectMealBolus,
     formatOffset,
     GC_TWO_HOUR_REFERENCE_MINUTES: TWO_HOUR_REFERENCE_MINUTES,
     GC_MEAL_CONTEXT_MINUTES: MEAL_CONTEXT_MINUTES,
+    GC_MEAL_BOLUS_ASSOCIATION_MINUTES: MEAL_BOLUS_ASSOCIATION_MINUTES,
     GC_DECLINE_CONFIRMATION_MINUTES: DECLINE_CONFIRMATION_MINUTES,
     GC_DECLINE_DROP_MGDL: DECLINE_DROP_MGDL,
     GC_DECLINE_REBOUND_TOLERANCE_MGDL: DECLINE_REBOUND_TOLERANCE_MGDL,

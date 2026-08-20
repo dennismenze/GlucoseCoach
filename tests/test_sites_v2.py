@@ -108,11 +108,13 @@ class PersonalSitesContractTests(unittest.TestCase):
             "Keine Diagnose, keine automatische Insulindosierung",
             "GC_TWO_HOUR_REFERENCE_MINUTES",
             "GC_MEAL_CONTEXT_MINUTES",
+            "GC_MEAL_BOLUS_ASSOCIATION_MINUTES",
             "GC_DECLINE_CONFIRMATION_MINUTES",
             "GC_DECLINE_DROP_MGDL",
             "nicht mehr auf zwei Stunden begrenzt",
-            "letzten positiven Bolus",
-            "Peak-Start neu",
+            "mahlzeitennaher positiver Bolus",
+            "starten den Peak nicht neu",
+            "mögliche Korrekturen",
             "2-h-Wert bleibt nur ein Referenzwert",
             "pharmakologischen Insulin-Wirkbeginns",
         ]
@@ -189,8 +191,9 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn("toHaveCount(7)", main_spec)
         peak_text = paths[1].read_text(encoding="utf-8")
         self.assertIn("mehr als zwei oder drei Stunden", peak_text)
-        self.assertIn("nach letztem Bolus", peak_text)
-        self.assertIn("220 min nach Essen", peak_text)
+        self.assertIn("nach Mahlzeitenbolus", peak_text)
+        self.assertIn("120 min nach Essen", peak_text)
+        self.assertIn("mögliche Korrektur", peak_text)
         self.assertIn("CGM-Wendepunkt-Proxy", peak_text)
         insulin_text = paths[2].read_text(encoding="utf-8")
         self.assertIn("assertEveryDisplayedInsulinNumber", insulin_text)
