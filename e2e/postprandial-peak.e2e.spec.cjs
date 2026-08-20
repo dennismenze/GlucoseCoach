@@ -117,7 +117,7 @@ function collectBrowserErrors(page) {
   return { consoleErrors, pageErrors };
 }
 
-test('meal peak may be after three hours and resets to the last bolus before sustained decline', async ({ page }) => {
+test('correction boluses do not replace the meal bolus or postpone its peak turn', async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const entries = [
     { when: '2026-08-17T07:30', food: 'Fettreiches Testessen' },
@@ -131,7 +131,9 @@ test('meal peak may be after three hours and resets to the last bolus before sus
   ];
   const boluses = [
     [firstStart + 10, 40, 1.2, 100, 'Bolus'],
+    [firstStart + 120, 0, 0.5, 170, 'Korrektur'],
     [secondStart + 10, 40, 1.2, 100, 'Bolus'],
+    [secondStart + 90, 0, 0.4, 205, 'Korrektur'],
     [secondStart + 150, 0, 0.6, 220, 'Korrektur'],
   ];
 
@@ -139,7 +141,9 @@ test('meal peak may be after three hours and resets to the last bolus before sus
   const intro = page.locator('#meal-analysis article.card.full p.muted');
   await expect(intro).toContainText('nicht mehr auf zwei Stunden begrenzt');
   await expect(intro).toContainText('Bis zu fünf Stunden');
-  await expect(intro).toContainText('letzten positiven Bolus');
+  await expect(intro).toContainText('mahlzeitennaher positiver Bolus');
+  await expect(intro).toContainText('starten den Peak nicht neu');
+  await expect(intro).toContainText('mögliche Korrekturen');
 
   for (const entry of entries) await addDiaryEntry(page, entry);
 
@@ -165,45 +169,50 @@ test('meal peak may be after three hours and resets to the last bolus before sus
   const newest = items.nth(0);
   const oldest = items.nth(1);
 
-  await expect((await gridCell(newest, 'Peak nach letztem Bolus')).locator('strong'))
-    .toHaveText('230 mg/dl · 70 min nach letztem Bolus · 220 min nach Essen');
-  await expect((await gridCell(newest, 'maßgeblicher letzter Bolus')).locator('strong'))
-    .toHaveText('0,6 E · 150 min nach Essen');
+  await expect((await gridCell(newest, 'Peak nach Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('240 mg/dl · 110 min nach Mahlzeitenbolus · 120 min nach Essen');
+  await expect((await gridCell(newest, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('1,2 E · 10 min nach Essen · 1 spätere Bolusgabe vor dem Wendepunkt als mögliche Korrektur behandelt');
   await expect((await gridCell(newest, 'CGM-Wendepunkt-Proxy')).locator('strong'))
-    .toHaveText('70 min nach letztem Bolus · 220 min nach Essen');
+    .toHaveText('110 min nach Mahlzeitenbolus · 120 min nach Essen');
   await expect((await gridCell(newest, '2-h-Wert')).locator('strong')).toHaveText('240 mg/dl');
 
-  await expect((await gridCell(oldest, 'Peak nach letztem Bolus')).locator('strong'))
-    .toHaveText('223 mg/dl · 195 min nach letztem Bolus · 205 min nach Essen');
+  await expect((await gridCell(oldest, 'Peak nach Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('223 mg/dl · 195 min nach Mahlzeitenbolus · 205 min nach Essen');
+  await expect((await gridCell(oldest, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('1,2 E · 10 min nach Essen · 1 spätere Bolusgabe vor dem Wendepunkt als mögliche Korrektur behandelt');
+  await expect((await gridCell(oldest, 'CGM-Wendepunkt-Proxy')).locator('strong'))
+    .toHaveText('195 min nach Mahlzeitenbolus · 205 min nach Essen');
   await expect((await gridCell(oldest, '2-h-Wert')).locator('strong')).toHaveText('172 mg/dl');
 
   const headers = page.locator('#food-comparison').locator('xpath=ancestor::table').locator('thead th');
   await expect(headers).toHaveText([
     'Lebensmittel / Mahlzeit', 'Einträge', 'auswertbar', 'Peak-Anstieg',
-    'Essen→Peak', 'letzter Bolus→Peak', '2-h-Änderung',
+    'Essen→Peak', 'Mahlzeitenbolus→Peak', '2-h-Änderung',
   ]);
 
   const comparison = page.locator('#food-comparison tr').filter({ hasText: 'Fettreiches Testessen' });
   await expect(comparison.locator('td')).toHaveText([
-    'Fettreiches Testessen', '2', '2', '127 mg/dl', '213 min', '133 min', '106 mg/dl',
+    'Fettreiches Testessen', '2', '2', '132 mg/dl', '163 min', '153 min', '106 mg/dl',
   ]);
   await expect(page.locator('#food-comparison-note')).toContainText('mehr als zwei oder drei Stunden');
-  await expect(page.locator('#food-comparison-note')).toContainText('letzten Bolus');
+  await expect(page.locator('#food-comparison-note')).toContainText('ersetzen den zugeordneten Mahlzeitenbolus nicht');
 
   await clickTab(page, 'recommendations');
   const recommendation = page.locator('#recommendation-list .rec').filter({ hasText: 'Fettreiches Testessen' });
-  await expect(recommendation.locator('dd').first()).toContainText('213 min ab Essen');
-  await expect(recommendation.locator('dd').first()).toContainText('133 min nach dem letzten Bolus');
+  await expect(recommendation.locator('dd').first()).toContainText('163 min ab Essen');
+  await expect(recommendation.locator('dd').first()).toContainText('153 min nach dem Mahlzeitenbolus');
 
   await clickTab(page, 'quality');
   const qualityRow = page.locator('#quality-body tr').filter({ hasText: 'Mahlzeiten-Peakfenster' });
-  await expect(qualityRow.locator('td').nth(1)).toHaveText('letzter Bolus → Rückgang · max. 5 h');
+  await expect(qualityRow.locator('td').nth(1)).toHaveText('Mahlzeitenbolus → Rückgang · max. 5 h');
+  await expect(qualityRow.locator('td').nth(2)).toContainText('starten den Peak nicht neu');
 
   expect(errors.consoleErrors, 'browser console errors').toEqual([]);
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
 });
 
-test('local CGM dip is rejected until the sustained post-bolus decline is confirmed', async ({ page }) => {
+test('local CGM dip is rejected until the sustained post-meal-bolus decline is confirmed', async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const entry = { when: '2026-08-19T07:30', food: 'Hafermilch', carbs: '5.9', fat: '1.4', protein: '0.8', fiber: '0.9' };
   const start = localMinute(entry.when);
@@ -228,12 +237,12 @@ test('local CGM dip is rejected until the sustained post-bolus decline is confir
   await clickTab(page, 'meal-analysis');
 
   const item = page.locator('#meal-events .analysis-item').first();
-  await expect((await gridCell(item, 'Peak nach letztem Bolus')).locator('strong'))
-    .toHaveText('161 mg/dl · 56 min nach letztem Bolus · 75 min nach Essen');
-  await expect((await gridCell(item, 'maßgeblicher letzter Bolus')).locator('strong'))
+  await expect((await gridCell(item, 'Peak nach Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('161 mg/dl · 56 min nach Mahlzeitenbolus · 75 min nach Essen');
+  await expect((await gridCell(item, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
     .toHaveText('0,2 E · 19 min nach Essen');
   await expect((await gridCell(item, 'CGM-Wendepunkt-Proxy')).locator('strong'))
-    .toHaveText('56 min nach letztem Bolus · 75 min nach Essen');
+    .toHaveText('56 min nach Mahlzeitenbolus · 75 min nach Essen');
 
   const intro = page.locator('#meal-analysis article.card.full p.muted');
   await expect(intro).toContainText('20 Minuten Hysterese');

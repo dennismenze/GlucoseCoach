@@ -5,6 +5,7 @@ const oracle = require('./oracle.cjs');
 const TWO_HOUR_REFERENCE_MINUTES = 120;
 const CONTEXT_MINUTES = 300;
 const BOLUS_LOOKBACK_MINUTES = 60;
+const MEAL_BOLUS_ASSOCIATION_MINUTES = 60;
 const CONFIRMATION_POINTS = 4;
 const CONFIRMATION_MINUTES = 20;
 const MAX_POINT_GAP_MINUTES = 7;
@@ -13,6 +14,12 @@ const REBOUND_TOLERANCE_MGDL = 3;
 const STEP_TOLERANCE_MGDL = 1;
 const MEALS = new Set(['Frühstück', 'Mittagessen', 'Abendessen', 'Snack']);
 const TIME_ZONE = 'Europe/Berlin';
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(String(value).replace(',', '.'));
+  return Number.isFinite(number) ? number : null;
+}
 
 function round(value, digits = 0) {
   if (!Number.isFinite(value)) return null;
@@ -38,6 +45,38 @@ function positiveBoluses(boluses, start, end) {
     .filter((row) => Number.isFinite(Number(row?.[0])))
     .filter((row) => row[0] >= start && row[0] <= end && Number(row[2]) > 0)
     .sort((a, b) => a[0] - b[0]);
+}
+
+function isExplicitCorrectionBolus(row) {
+  return /korrektur|correction/i.test(String(row?.[4] ?? ''));
+}
+
+function selectMealBolus(entry, boluses, minute, contextEnd) {
+  const candidates = positiveBoluses(
+    boluses,
+    minute - BOLUS_LOOKBACK_MINUTES,
+    Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+  );
+  if (!candidates.length) return null;
+
+  const carbohydrateCandidates = candidates.filter((row) => Number(row[1]) > 0);
+  const nonCorrectionCandidates = candidates.filter((row) => !isExplicitCorrectionBolus(row));
+  const pool = carbohydrateCandidates.length
+    ? carbohydrateCandidates
+    : nonCorrectionCandidates;
+  if (!pool.length) return null;
+
+  const diaryCarbs = numberOrNull(entry?.carbs);
+  return [...pool].sort((a, b) => {
+    if (carbohydrateCandidates.length && diaryCarbs !== null) {
+      const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
+        Math.abs(Number(b[1]) - diaryCarbs);
+      if (carbohydrateDistance !== 0) return carbohydrateDistance;
+    }
+    const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
+    if (timeDistance !== 0) return timeDistance;
+    return a[0] - b[0];
+  })[0] || null;
 }
 
 function confirmation(rows, startIndex) {
@@ -134,14 +173,22 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     minute - BOLUS_LOOKBACK_MINUTES,
     contextEnd,
   );
-  const lastBolus = allBoluses.at(-1) || null;
-  const searchStart = lastBolus
-    ? Math.max(minute + 5, lastBolus[0] + 10)
+  const mealBolusCandidates = positiveBoluses(
+    boluses,
+    minute - BOLUS_LOOKBACK_MINUTES,
+    Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+  );
+  const bolus = selectMealBolus(entry, boluses, minute, contextEnd);
+  const searchStart = bolus
+    ? Math.max(minute + 5, bolus[0] + 10)
     : minute + 5;
-  const turn = sustainedDecline(post, searchStart);
-  const bolus = turn
-    ? allBoluses.filter((row) => row[0] <= turn[0]).at(-1) || null
-    : null;
+  const turn = bolus ? sustainedDecline(post, searchStart) : null;
+  const bolusesBeforeTurn = turn
+    ? allBoluses.filter((row) => row[0] <= turn[0])
+    : [];
+  const ignoredBolusesBeforeTurn = bolus
+    ? bolusesBeforeTurn.filter((row) => row[0] > bolus[0])
+    : [];
   const peakRows = turn && bolus
     ? windowRows.filter((row) => row[0] >= bolus[0] && row[0] <= turn[0])
     : [];
@@ -150,10 +197,10 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     : null;
 
   let status = 'partial-analysis';
-  if (!allBoluses.length) status = 'missing-bolus';
+  if (!bolus) status = allBoluses.length ? 'missing-meal-bolus' : 'missing-bolus';
   else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
   else if (!turn) status = 'no-stable-decline';
-  else if (!bolus || !peakRow || !two) status = 'partial-analysis';
+  else if (!peakRow || !two) status = 'partial-analysis';
   else status = 'complete';
 
   return {
@@ -170,8 +217,11 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     twoHour: two?.[1] ?? null,
     twoHourDelta: two ? two[1] - baseline : null,
     bolus,
+    mealBolus: bolus,
     bolusOffset: bolus ? bolus[0] - minute : null,
-    bolusCountBeforeTurn: turn ? allBoluses.filter((row) => row[0] <= turn[0]).length : 0,
+    mealBolusCandidateCount: mealBolusCandidates.length,
+    bolusCountBeforeTurn: bolusesBeforeTurn.length,
+    ignoredBolusCountBeforeTurn: ignoredBolusesBeforeTurn.length,
     turnMinute: turn?.[0] ?? null,
     turnFromMeal: turn ? turn[0] - minute : null,
     turnFromBolus: turn && bolus ? turn[0] - bolus[0] : null,
@@ -246,7 +296,7 @@ oracle.expectedRecommendations = function adaptiveExpectedRecommendations(fixtur
       finding:
         `${group.analyzed} Wiederholungen zeigen im Median einen Peak-Anstieg von ` +
         `${group.medianPeakDelta ?? '–'} mg/dl nach ${group.medianMinutesToPeak ?? '–'} min ` +
-        `ab Essen und ${group.medianMinutesBolusToPeak ?? '–'} min nach dem letzten Bolus ` +
+        `ab Essen und ${group.medianMinutesBolusToPeak ?? '–'} min nach dem Mahlzeitenbolus ` +
         'vor dem anhaltenden Rückgang.',
     } : {
       title: `${group.label} ist mehrfach dokumentiert`,
