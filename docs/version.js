@@ -1,1 +1,1 @@
-window.GLUCOSECOACH_VERSION = 'v2026.08.20.0-source';
+window.GLUCOSECOACH_VERSION = 'v2026.08.20.1-07d6dfa';
