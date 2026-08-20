@@ -66,10 +66,13 @@ async function nativeGlookoZip() {
       text: csv('Glooko Export', ['Zeitstempel', 'KH (g)'], [[clock(0), 45]]),
     },
   ];
-  return Buffer.from(await zip.createZip(files, { compress: false, date: new Date('2026-08-17T12:00:00Z') }));
+  return Buffer.from(await zip.createZip(files, {
+    compress: false,
+    date: new Date('2026-08-17T12:00:00Z'),
+  }));
 }
 
-test('native Glooko ZIP becomes the read-only meal source', async ({ page }) => {
+test('native Glooko ZIP augments the still-editable local diary', async ({ page }) => {
   const consoleErrors = [];
   const pageErrors = [];
   page.on('console', (message) => {
@@ -78,10 +81,14 @@ test('native Glooko ZIP becomes the read-only meal source', async ({ page }) => 
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto('/');
-  await expect(page.locator('#glooko-meal-source')).toHaveCount(1);
+  await expect(page.locator('#glooko-source-control')).toHaveCount(1);
+  await expect(page.locator('#glooko-meal-source')).toHaveCount(0);
+  await expect(page.locator('#diary-form')).toBeVisible();
 
   await page.locator('nav button[data-panel="import-data"]').click();
-  await expect(page.locator('#glooko-workflow')).toContainText('Geräte und Essen in Glooko erfassen');
+  await expect(page.locator('#glooko-workflow')).toContainText(
+    'Alternativ oder ergänzend können Mahlzeiten weiterhin direkt',
+  );
   await expect(page.locator('.import-drop p').first()).toContainText('Glooko-Webexport');
 
   const buffer = await nativeGlookoZip();
@@ -94,28 +101,56 @@ test('native Glooko ZIP becomes the read-only meal source', async ({ page }) => 
   await page.locator('#import-csv').click();
   await expect(page.locator('#import-progress')).toContainText('Fertig:');
   await expect(page.locator('#overview')).toHaveClass(/\bactive\b/);
-  await expect(page.locator('#source-pill')).toHaveText('Glooko-Export · lokal ausgewertet');
+  await expect(page.locator('#source-pill')).toHaveText(
+    'Glooko-Export + lokales Tagebuch · lokal ausgewertet',
+  );
 
-  const stored = await page.evaluate(() => ({
+  const storedAfterImport = await page.evaluate(() => ({
     diary: JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),
     clinical: JSON.parse(localStorage.getItem('glucosecoach-clinical-v1') || '{}'),
   }));
-  expect(stored.diary).toEqual([]);
-  expect(stored.clinical.foodEvents).toHaveLength(2);
-  expect(stored.clinical.cgmCarbs).toHaveLength(1);
+  expect(storedAfterImport.diary).toEqual([]);
+  expect(storedAfterImport.clinical.foodEvents).toHaveLength(2);
+  expect(storedAfterImport.clinical.cgmCarbs).toHaveLength(1);
 
   await page.locator('nav button[data-panel="meal-analysis"]').click();
   await expect(page.locator('#meal-summary strong')).toHaveText(['1', '1', '1', '1']);
   const meal = page.locator('#meal-events .analysis-item').first();
-  await expect(meal.locator('.analysis-head strong')).toHaveText('Frühstück · Haferflocken + Hafermilch');
+  await expect(meal.locator('.analysis-head strong')).toHaveText(
+    'Frühstück · Haferflocken + Hafermilch',
+  );
   await expect(meal.locator('.status')).toHaveText('vollständig');
 
   await page.locator('nav button[data-panel="diary"]').click();
-  await expect(page.locator('#glooko-meal-source')).toHaveValue('glooko');
-  await expect(page.locator('#diary-form')).toBeHidden();
-  await expect(page.locator('#entries details.entry[data-source="glooko"]')).toHaveCount(1);
-  await expect(page.locator('#entries')).toContainText('Glooko · nur lesbar');
-  await expect(page.locator('#entries .remove-entry')).toHaveCount(0);
+  await expect(page.locator('#diary-form')).toBeVisible();
+  await expect(page.locator('#glooko-source-control')).toContainText(
+    'Beide Quellen fließen gemeinsam in die Auswertung ein',
+  );
+  const glookoEntry = page.locator('#entries .entry[data-source="glooko"]');
+  await expect(glookoEntry).toHaveCount(1);
+  await expect(glookoEntry).toContainText('Glooko · nur lesbar');
+  await expect(glookoEntry.locator('.remove-entry')).toHaveCount(0);
+
+  await page.locator('#when').fill('2026-08-17T16:00');
+  await page.locator('#occasion').selectOption({ label: 'Snack' });
+  await page.locator('#food').fill('Lokaler Testsnack');
+  await page.locator('#carbs').fill('12');
+  await page.locator('#diary-form button[type="submit"]').click();
+
+  await expect(page.locator('#meal-analysis')).toHaveClass(/\bactive\b/);
+  await expect(page.locator('#meal-summary strong')).toHaveText(['2', '1', '1', '1']);
+
+  const storedAfterLocalEntry = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),
+  );
+  expect(storedAfterLocalEntry).toHaveLength(1);
+  expect(storedAfterLocalEntry[0].food).toBe('Lokaler Testsnack');
+
+  await page.locator('nav button[data-panel="diary"]').click();
+  await expect(page.locator('#entries .entry[data-source="glooko"]')).toHaveCount(1);
+  await expect(page.locator('#entries .entry[data-source="local"]')).toHaveCount(1);
+  await expect(page.locator('#entries .remove-entry')).toHaveCount(1);
+  await expect(page.locator('#entries')).toContainText('Lokaler Testsnack');
 
   expect(consoleErrors, 'browser console errors').toEqual([]);
   expect(pageErrors, 'uncaught page errors').toEqual([]);
