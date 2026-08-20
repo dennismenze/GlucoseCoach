@@ -227,6 +227,7 @@
       .glooko-source-control { margin:0 0 16px; }
       .glooko-source-control label { display:grid; gap:7px; font-weight:800; }
       .glooko-source-control p { margin:10px 0 0; }
+      #diary-form[hidden] { display:none !important; }
       .glooko-readonly-note { margin:8px 14px 14px; color:var(--muted); }
       .glooko-source-badge {
         display:inline-block;
@@ -309,7 +310,9 @@
       if (typeof gcRender === 'function') gcRender();
     };
 
-    form.hidden = mode === SOURCE_GLOOKO;
+    const hideLocalForm = mode === SOURCE_GLOOKO;
+    form.hidden = hideLocalForm;
+    form.style.display = hideLocalForm ? 'none' : '';
     const heading = card.querySelector('h2');
     if (heading) heading.textContent = mode === SOURCE_GLOOKO
       ? 'Mahlzeiten aus Glooko'
