@@ -11,6 +11,7 @@
       const exportCore = require('./app-export-core.js');
       const zipExchange = require('./app-zip64-compat.js');
       const insulinSummaryCore = require('./app-insulin-summary-core.js');
+      const glookoMode = require('./app-glooko-mode.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -23,6 +24,7 @@
         ...zipExchange,
         ...insulinSummaryCore,
         ...allBolusPhases,
+        ...glookoMode,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
@@ -67,7 +69,9 @@
                                 loadScript('app-compact-lists.js', () =>
                                   loadScript('app-insulin-page-ui.js', () =>
                                     loadScript('app-meal-page-ui.js', () =>
-                                      loadScript('app-version.js'),
+                                      loadScript('app-glooko-mode.js', () =>
+                                        loadScript('app-version.js'),
+                                      ),
                                     ),
                                   ),
                                 ),
