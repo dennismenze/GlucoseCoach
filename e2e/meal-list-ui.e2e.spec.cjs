@@ -51,7 +51,7 @@ test('meal analysis and diary entries start compact and remain date-filterable',
   await expect(page.locator('#meal-events-compact-summary')).toHaveText('4 Mahlzeiten für alle Tage anzeigen');
 
   await page.locator('#meal-event-date').selectOption('2026-08-02');
-  await expect(page.locator('#meal-events-compact-summary')).toHaveText('2 Mahlzeiten für 2. Aug. 2026 anzeigen');
+  await expect(page.locator('#meal-events-compact-summary')).toHaveText('2 Mahlzeiten für 02.08.2026 anzeigen');
   await expect(page.locator('#meal-events .meal-event:not([hidden])')).toHaveCount(2);
   await expect(page.locator('#meal-events .meal-event[hidden]')).toHaveCount(2);
 
@@ -69,12 +69,12 @@ test('meal analysis and diary entries start compact and remain date-filterable',
 
   await page.locator('#diary-entry-date').selectOption('2026-08-02');
   await expect(page.locator('#entries .diary-entry:not([hidden])')).toHaveCount(3);
-  await expect(page.locator('#diary-entries-compact-summary')).toHaveText('3 Tagebucheinträge für 2. Aug. 2026 anzeigen');
+  await expect(page.locator('#diary-entries-compact-summary')).toHaveText('3 Tagebucheinträge für 02.08.2026 anzeigen');
 
   await diaryDisclosure.locator(':scope > summary').click();
   const firstVisible = page.locator('#entries .diary-entry:not([hidden])').first();
   await firstVisible.locator(':scope > summary').click();
   await firstVisible.locator('.remove-entry').click();
   await expect(page.locator('#entries .diary-entry')).toHaveCount(4);
-  await expect(page.locator('#diary-entries-compact-summary')).toHaveText('2 Tagebucheinträge für 2. Aug. 2026 anzeigen');
+  await expect(page.locator('#diary-entries-compact-summary')).toHaveText('2 Tagebucheinträge für 02.08.2026 anzeigen');
 });
