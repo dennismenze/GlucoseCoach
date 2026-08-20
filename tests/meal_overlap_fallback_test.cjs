@@ -62,6 +62,19 @@ function testMealBolusCreatesFallbackReference() {
   assert.equal(result.nextMealBolusFromMeal, 90);
   assert.equal(result.twoHourFallbackObservedFromMeal, 50);
   assert.ok(result.turnMinute < data.mealMinute + 90);
+
+  const groups = patched.buildFoodComparisons([
+    result,
+    {
+      ...result,
+      entry: { ...result.entry, when: '2026-08-02T08:00' },
+    },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].entries, 2);
+  assert.equal(groups[0].analyzed, 2);
+  assert.equal(groups[0].twoHourFallbackCount, 2);
+  assert.equal(groups[0].medianTwoHourDelta, 66);
 }
 
 function testCorrectionBolusDoesNotCutOffTwoHourReference() {
