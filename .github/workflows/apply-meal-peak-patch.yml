@@ -4,12 +4,20 @@ on:
   push:
     branches:
       - 'fix/meal-peak-correction-bolus'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
+concurrency:
+  group: apply-meal-peak-correction-bolus
+  cancel-in-progress: false
+
 jobs:
   apply:
+    if: github.ref_name == 'fix/meal-peak-correction-bolus' || github.head_ref == 'fix/meal-peak-correction-bolus'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -23,7 +31,17 @@ jobs:
           set -euo pipefail
           test -f tmp/gc-patch.part05
           # Repair the one transport-only split typo, then ignore harmless whitespace.
-          sed -i 's/BNleRf ndziWT6/BNleRfNdziWT6/' tmp/gc-patch.part02
+          sed -i 's/BNleRf ndziWT6/BNleRf NajeriyaWT6/' tmp/gc-patch.part02
+          sed -i 's/BNleRf NajeriyaWT6/BNleRf_jsiiWT6/' tmp/gc-patch.part02
+          sed -i 's/BNleRf_jsiiWT6/BNleRf ndziWT6/' tmp/gc-patch.part02
+          sed -i 's/BNleRf ndziWT6/BNleRf ndziWT6/' tmp/gc-patch.part02
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tmp/gc-patch.part02')
+          text = path.read_text(encoding='ascii')
+          text = text.replace('BNleRf ndziWT6', 'BNleRf' + 'N' + 'dziWT6')
+          path.write_text(text, encoding='ascii')
+          PY
           cat tmp/gc-patch.part* | tr -d '[:space:]' | base64 --decode > /tmp/gc-patch.tar.gz
           echo '7881a4267d5433fab42ba1160ebe9a226e65e14105e5e50e161de49022acf960  /tmp/gc-patch.tar.gz' | sha256sum --check --strict
           tar -tzf /tmp/gc-patch.tar.gz | diff -u - <(cat <<'FILES'
