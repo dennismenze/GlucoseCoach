@@ -3,6 +3,14 @@
 
   const PROFILE_KEY = 'glucosecoach-profile-v1';
   const KNOWN_IMPORT_FILE = /^(?:cgm_data_|bolus_data_|insulin_data_|basal_data_|bg_data_|alarms_data_|cgm_carbs_data_|exercise_data_|food_data_|manual_insulin_data_|medication_data_|notes_data_)/i;
+  const KIND_LABELS = Object.freeze({
+    cgmCarbs: 'CGM-Kohlenhydrate',
+    exercise: 'Sport',
+    food: 'Lebensmittel',
+    manualInsulin: 'manuelles Insulin',
+    medication: 'Medikamente',
+    note: 'Notizen',
+  });
   let pendingFiles = [];
   let importRunning = false;
 
@@ -73,12 +81,13 @@
     if (!list.length) return 'Keine Dateien ausgewählt.';
     const zipCount = list.filter((file) => /\.zip$/i.test(file.name || '')).length;
     const csvCount = list.filter((file) => /\.csv$/i.test(file.name || '')).length;
+    const other = list.length - zipCount - csvCount;
+    if (zipCount === 0 && other === 0) return `${list.length} Datei(en) ausgewählt.`;
     const parts = [];
     if (zipCount) parts.push(`${zipCount} ZIP`);
     if (csvCount) parts.push(`${csvCount} CSV`);
-    const other = list.length - zipCount - csvCount;
     if (other) parts.push(`${other} andere`);
-    return `${list.length} Datei(en) ausgewählt${parts.length ? ` (${parts.join(', ')})` : ''}.`;
+    return `${list.length} Datei(en) ausgewählt (${parts.join(', ')}).`;
   }
 
   function setPendingFiles(files) {
@@ -102,25 +111,29 @@
 
   function formatImportSummary(summary, ignoredCount = 0) {
     const parts = [
-      [summary.cgmAdded, 'CGM-Wert', 'CGM-Werte'],
-      [summary.bolusesAdded, 'Bolusereignis', 'Bolusereignisse'],
-      [summary.dailyInsulinAdded, 'Tages-Insulinzeile', 'Tages-Insulinzeilen'],
-      [summary.basalEventsAdded, 'Basalereignis', 'Basalereignisse'],
-      [summary.manualGlucoseAdded, 'manueller Glukosewert', 'manuelle Glukosewerte'],
-      [summary.alarmsAdded, 'Alarm/Ereignis', 'Alarme/Ereignisse'],
-      [summary.cgmCarbsAdded, 'CGM-KH-Ereignis', 'CGM-KH-Ereignisse'],
-      [summary.exerciseAdded, 'Sportereignis', 'Sportereignisse'],
-      [summary.foodAdded, 'Lebensmitteleintrag', 'Lebensmitteleinträge'],
-      [summary.manualInsulinAdded, 'manueller Insulineintrag', 'manuelle Insulineinträge'],
-      [summary.medicationsAdded, 'Medikament', 'Medikamente'],
-      [summary.notesAdded, 'Notiz', 'Notizen'],
+      [summary.cgmAdded, 'CGM-Werte'],
+      [summary.bolusesAdded, 'Bolusereignisse'],
+      [summary.dailyInsulinAdded, 'Tages-Insulinzeilen'],
+      [summary.basalEventsAdded, 'Basalereignisse'],
+      [summary.manualGlucoseAdded, 'manuelle Glukosewerte'],
+      [summary.alarmsAdded, 'Alarme/Ereignisse'],
+      [summary.cgmCarbsAdded, 'CGM-KH-Ereignisse'],
+      [summary.exerciseAdded, 'Sportereignisse'],
+      [summary.foodAdded, 'Lebensmitteleinträge'],
+      [summary.manualInsulinAdded, 'manuelle Insulineinträge'],
+      [summary.medicationsAdded, 'Medikamente'],
+      [summary.notesAdded, 'Notizen'],
     ]
       .filter(([count]) => Number(count) > 0)
-      .map(([count, singular, plural]) => `${count} neue ${Number(count) === 1 ? singular : plural}`);
-    if (!parts.length) parts.push('keine neuen Datenzeilen (nur Duplikate oder leere Dateien)');
-    if (Number(summary.rejected) > 0) parts.push(`${summary.rejected} Zeilen verworfen`);
-    if (ignoredCount > 0) parts.push(`${ignoredCount} nicht unterstützte CSV ignoriert`);
-    return parts.join(' · ');
+      .map(([count, label]) => `${count} neue ${label}`);
+    const kinds = [...new Set(summary.kinds || [])]
+      .map((kind) => KIND_LABELS[kind] || kind)
+      .join(', ');
+    if (!parts.length) parts.push('keine neuen Datenzeilen');
+    let result = `${parts.join(', ')}${kinds ? ` · erkannt: ${kinds}` : ''}`;
+    if (Number(summary.rejected) > 0) result += ` · ${summary.rejected} verworfen`;
+    if (ignoredCount > 0) result += ` · ${ignoredCount} nicht unterstützte CSV ignoriert`;
+    return result;
   }
 
   function applyRestoredPayload(payload, clinical) {
@@ -276,7 +289,7 @@
     document.querySelector('#import-complete-csv-label')?.remove();
     const description = drop.querySelector('p');
     if (description) {
-      description.innerHTML = '<strong>ZIP hier ablegen oder CSV/ZIP auswählen:</strong> ZIP-Archive werden lokal entpackt; enthaltene CSV-Dateien dürfen auch in Unterordnern liegen.';
+      description.innerHTML = '<strong>Kompletter Omnipod-Export als CSV oder ZIP:</strong> ZIP hier ablegen oder CSV/ZIP auswählen. ZIP-Archive werden lokal entpackt; enthaltene CSV-Dateien dürfen auch in Unterordnern liegen.';
     }
     const secondary = drop.querySelectorAll('p')[1];
     if (secondary) {
