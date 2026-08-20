@@ -131,7 +131,7 @@ assert(foodCard, 'expected repeated food comparison recommendation');
 assert(foodCard.finding.includes('163 min ab Essen'));
 assert(foodCard.finding.includes('153 min nach dem Mahlzeitenbolus'));
 assert(foodCard.boundary.includes('starten den Peak nicht neu'));
-assert(foodCard.boundary.includes('mögliche Korrekturen'));
+assert(foodCard.boundary.includes('Korrekturboli behandelt'));
 assert(foodCard.boundary.includes('keine Dosisempfehlung'));
 
 const noBolusEntry = {
@@ -151,11 +151,12 @@ const correctionOnlyStart = minute(noBolusEntry.when);
 const correctionOnly = app.analyzeMeals(
   [noBolusEntry],
   lateFatCurve(noBolusEntry.when),
-  [[correctionOnlyStart + 20, 0, 0.6, 150, 'Korrektur']],
+  [[correctionOnlyStart + 20, null, 0.6, 150, 'Bolus']],
 )[0];
 assert.equal(correctionOnly.complete, false);
 assert.equal(correctionOnly.status, 'missing-meal-bolus');
 assert.equal(correctionOnly.bolus, null);
+assert.equal(correctionOnly.mealBolusCandidateCount, 0);
 assert.equal(correctionOnly.peak, null);
 
 const lateBolusOnly = app.analyzeMeals(
@@ -195,4 +196,4 @@ assert.equal(overlap.complete, false);
 assert.equal(overlap.status, 'overlapping-meal');
 assert.equal(overlap.truncatedByNextMeal, true);
 
-console.log('Adaptive postprandial peak and correction-bolus contracts passed');
+console.log('Adaptive postprandial peak and carbohydrate-based bolus contracts passed');

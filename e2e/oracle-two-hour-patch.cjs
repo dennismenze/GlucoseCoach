@@ -47,38 +47,26 @@ function positiveBoluses(boluses, start, end) {
     .sort((a, b) => a[0] - b[0]);
 }
 
-function isExplicitCorrectionBolus(row) {
-  return /korrektur|correction/i.test(String(row?.[4] ?? ''));
-}
-
 function selectMealBolus(entry, boluses, minute, contextEnd) {
-  const candidates = positiveBoluses(
-    boluses,
-    minute - BOLUS_LOOKBACK_MINUTES,
-    Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
-  );
-  if (!candidates.length) return null;
+    const carbohydrateCandidates = positiveBoluses(
+      boluses,
+      minute - BOLUS_LOOKBACK_MINUTES,
+      Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+    ).filter((row) => Number(row[1]) > 0);
+    if (!carbohydrateCandidates.length) return null;
 
-  const carbohydrateCandidates = candidates.filter((row) => Number(row[1]) > 0);
-  const nonCorrectionCandidates = candidates.filter((row) => !isExplicitCorrectionBolus(row));
-  const pool = carbohydrateCandidates.length
-    ? carbohydrateCandidates
-    : nonCorrectionCandidates;
-  if (!pool.length) return null;
-
-  const diaryCarbs = numberOrNull(entry?.carbs);
-  return [...pool].sort((a, b) => {
-    if (carbohydrateCandidates.length && diaryCarbs !== null) {
-      const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
-        Math.abs(Number(b[1]) - diaryCarbs);
-      if (carbohydrateDistance !== 0) return carbohydrateDistance;
-    }
-    const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
-    if (timeDistance !== 0) return timeDistance;
-    return a[0] - b[0];
-  })[0] || null;
-}
-
+    const diaryCarbs = numberOrNull(entry?.carbs);
+    return [...carbohydrateCandidates].sort((a, b) => {
+      if (diaryCarbs !== null) {
+        const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
+          Math.abs(Number(b[1]) - diaryCarbs);
+        if (carbohydrateDistance !== 0) return carbohydrateDistance;
+      }
+      const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
+      if (timeDistance !== 0) return timeDistance;
+      return a[0] - b[0];
+    })[0] || null;
+  }
 function confirmation(rows, startIndex) {
   const candidate = rows[startIndex];
   const future = [];
@@ -177,7 +165,7 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     boluses,
     minute - BOLUS_LOOKBACK_MINUTES,
     Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
-  );
+  ).filter((row) => Number(row[1]) > 0);
   const bolus = selectMealBolus(entry, boluses, minute, contextEnd);
   const searchStart = bolus
     ? Math.max(minute + 5, bolus[0] + 10)
@@ -187,7 +175,9 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     ? allBoluses.filter((row) => row[0] <= turn[0])
     : [];
   const ignoredBolusesBeforeTurn = bolus
-    ? bolusesBeforeTurn.filter((row) => row[0] > bolus[0])
+    ? bolusesBeforeTurn.filter(
+        (row) => row[0] > bolus[0] && !(Number(row[1]) > 0),
+      )
     : [];
   const peakRows = turn && bolus
     ? windowRows.filter((row) => row[0] >= bolus[0] && row[0] <= turn[0])

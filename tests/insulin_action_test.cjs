@@ -35,10 +35,10 @@ const clinical = {
   cgm: correctionTimes.flatMap((when, index) => correctionCurve(when, index * 2)),
   boluses: correctionTimes.map((when, index) => [
     minute(when),
-    0,
+    index % 2 === 0 ? null : 0,
     1 + index * 0.2,
     220 + index * 2,
-    'Korrektur',
+    'Bolus',
   ]),
   basalEvents: [],
   exerciseEvents: [],
@@ -53,7 +53,7 @@ assert.equal(insulin.GC_INSULIN_ACTION_WINDOW_MINUTES, 300);
 assert.equal(insulin.GC_INSULIN_MIN_AGGREGATE_EVENTS, 3);
 assert.equal(result.events.length, 4);
 assert.equal(result.aggregate.totalBoluses, 4);
-assert.equal(result.aggregate.correctionCandidates, 4);
+assert.equal(result.aggregate.correctionBoluses, 4);
 assert.equal(result.aggregate.eligibleCorrections, 4);
 assert.equal(result.aggregate.analyzedCorrections, 4);
 assert.equal(result.aggregate.sufficient, true);
@@ -69,7 +69,8 @@ assert(result.aggregate.byTimeOfDay.some((group) => group.label.includes('Morgen
 assert(result.aggregate.byBolusSize.some((group) => group.label.includes('mittel')));
 
 for (const event of result.events) {
-  assert.equal(event.correctionCandidate, true);
+  assert.equal(event.classification, 'Korrekturbolus');
+  assert.equal(event.correctionBolus, true);
   assert.equal(event.eligibleCorrection, true);
   assert.equal(event.detectable, true);
   assert.equal(event.exclusionReasons.length, 0);
@@ -91,22 +92,40 @@ const mealTime = '2026-08-10T08:00';
 const mealClinical = {
   ...clinical,
   cgm: correctionCurve(mealTime),
-  boluses: [[minute(mealTime), 45, 3.2, 220, 'Mahlzeit']],
+  boluses: [[minute(mealTime), 45, 3.2, 220, 'Korrektur']],
 };
-const mealResult = insulin.analyzeInsulinAction(mealClinical, [{
-  when: mealTime,
-  occasion: 'Frühstück',
-  food: 'Haferfrühstück',
-  illness: 'nein',
-}]);
+const mealResult = insulin.analyzeInsulinAction(mealClinical, []);
 assert.equal(mealResult.events.length, 1);
-assert.equal(mealResult.events[0].classification, 'Mahlzeiten-/Kontextbolus');
-assert.equal(mealResult.events[0].correctionCandidate, false);
+assert.equal(mealResult.events[0].classification, 'Mahlzeitenbolus');
+assert.equal(mealResult.events[0].correctionBolus, false);
 assert.equal(mealResult.events[0].eligibleCorrection, false);
 assert(mealResult.events[0].exclusionReasons.some((reason) => reason.includes('Kohlenhydrate')));
 assert.equal(mealResult.aggregate.analyzedCorrections, 0);
 assert.equal(mealResult.aggregate.sufficient, false);
 
+const contextualCorrectionTime = '2026-08-10T12:00';
+const contextualCorrectionClinical = {
+  ...clinical,
+  cgm: correctionCurve(contextualCorrectionTime),
+  boluses: [[minute(contextualCorrectionTime), null, 1.1, 220, 'Bolus']],
+};
+const contextualCorrection = insulin.analyzeInsulinAction(
+  contextualCorrectionClinical,
+  [{
+    when: contextualCorrectionTime,
+    occasion: 'Mittagessen',
+    food: 'Tagebuch-Mahlzeit',
+    illness: 'nein',
+  }],
+);
+assert.equal(contextualCorrection.events[0].classification, 'Korrekturbolus');
+assert.equal(contextualCorrection.events[0].correctionBolus, true);
+assert.equal(contextualCorrection.events[0].eligibleCorrection, false);
+assert(
+  contextualCorrection.events[0].exclusionReasons.some(
+    (reason) => reason.includes('Tagebuch-Mahlzeit'),
+  ),
+);
 const exerciseTime = '2026-08-11T08:00';
 const exerciseClinical = {
   ...clinical,
@@ -115,7 +134,7 @@ const exerciseClinical = {
   exerciseEvents: [[minute(exerciseTime) + 45, 'Spaziergang', 'Mittel', 30, 100]],
 };
 const exerciseResult = insulin.analyzeInsulinAction(exerciseClinical, []);
-assert.equal(exerciseResult.events[0].correctionCandidate, true);
+assert.equal(exerciseResult.events[0].correctionBolus, true);
 assert.equal(exerciseResult.events[0].eligibleCorrection, false);
 assert(exerciseResult.events[0].exclusionReasons.some((reason) => reason.includes('Sport')));
 
@@ -134,4 +153,4 @@ assert(overlapResult.events.every((event) =>
   event.exclusionReasons.some((reason) => reason.includes('weiterer Bolus')),
 ));
 
-console.log('Personal insulin-action estimation contracts passed');
+console.log('Personal insulin-action and carbohydrate-based classification contracts passed');

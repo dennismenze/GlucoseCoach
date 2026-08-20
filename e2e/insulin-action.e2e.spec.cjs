@@ -33,6 +33,10 @@ async function importFixture(page, fixture) {
 }
 
 async function assertEveryDisplayedInsulinNumber(page, expected) {
+  const summaryLabels = page.locator('#insulin-summary span');
+  await expect(summaryLabels).toHaveCount(expected.summaryLabels.length);
+  await expect(summaryLabels).toHaveText(expected.summaryLabels);
+
   const summaryValues = page.locator('#insulin-summary strong');
   await expect(summaryValues).toHaveCount(expected.summary.length);
   await expect(summaryValues).toHaveText(expected.summary);
@@ -105,6 +109,9 @@ test('personal insulin-action tab verifies every displayed calculated value', as
 
   await expect(page.locator('#insulin-action h2').first()).toHaveText(
     'Geschätzte effektive Glukosesenkungswirkung von Bolusinsulin',
+  );
+  await expect(page.locator('#insulin-method-note')).toContainText(
+    'ohne positive Kohlenhydratangabe werden immer als Korrekturbolus klassifiziert',
   );
   await expect(page.locator('#insulin-method-note')).toContainText(
     'Pumpeneinstellung von 2 Stunden wird für diese Schätzung nicht verwendet',

@@ -71,28 +71,17 @@
       .sort((a, b) => a[0] - b[0]);
   }
 
-  function isExplicitCorrectionBolus(row) {
-    return /korrektur|correction/i.test(String(row?.[4] ?? ''));
-  }
-
   function selectMealBolus(entry, boluses, minute, contextEnd = minute + MEAL_CONTEXT_MINUTES) {
-    const candidates = positiveBoluses(
+    const carbohydrateCandidates = positiveBoluses(
       boluses,
       minute - BOLUS_LOOKBACK_MINUTES,
       Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
-    );
-    if (!candidates.length) return null;
-
-    const carbohydrateCandidates = candidates.filter((row) => Number(row[1]) > 0);
-    const nonCorrectionCandidates = candidates.filter((row) => !isExplicitCorrectionBolus(row));
-    const pool = carbohydrateCandidates.length
-      ? carbohydrateCandidates
-      : nonCorrectionCandidates;
-    if (!pool.length) return null;
+    ).filter((row) => Number(row[1]) > 0);
+    if (!carbohydrateCandidates.length) return null;
 
     const diaryCarbs = numberOrNull(entry?.carbs);
-    return [...pool].sort((a, b) => {
-      if (carbohydrateCandidates.length && diaryCarbs !== null) {
+    return [...carbohydrateCandidates].sort((a, b) => {
+      if (diaryCarbs !== null) {
         const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
           Math.abs(Number(b[1]) - diaryCarbs);
         if (carbohydrateDistance !== 0) return carbohydrateDistance;
@@ -102,7 +91,6 @@
       return a[0] - b[0];
     })[0] || null;
   }
-
   function contiguousConfirmation(rows, startIndex) {
     const candidate = rows[startIndex];
     const future = [];
@@ -234,7 +222,7 @@
       boluses,
       minute - BOLUS_LOOKBACK_MINUTES,
       Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
-    );
+    ).filter((row) => Number(row[1]) > 0);
     const bolus = selectMealBolus(entry, boluses, minute, contextEnd);
     const declineSearchStart = bolus
       ? Math.max(minute + 5, bolus[0] + 10)
@@ -244,7 +232,9 @@
       ? bolusesInContext.filter((row) => row[0] <= turn[0])
       : [];
     const ignoredBolusesBeforeTurn = bolus
-      ? bolusesBeforeTurn.filter((row) => row[0] > bolus[0])
+      ? bolusesBeforeTurn.filter(
+          (row) => row[0] > bolus[0] && !(Number(row[1]) > 0),
+        )
       : [];
 
     const peakRows = turn && bolus
@@ -368,9 +358,9 @@
           'vor dem anhaltenden Rückgang.',
         boundary:
           'Der Peak ist der höchste persönliche CGM-Wert zwischen dem mahlzeitennahen ' +
-          'positiven Bolus und dem stabil bestätigten Rückgang. Weitere positive Boli ohne ' +
-          'neue protokollierte Mahlzeit starten den Peak nicht neu und werden als mögliche ' +
-          'Korrekturen behandelt. Sie können den CGM-Verlauf trotzdem beeinflussen. Das ist ' +
+          'positiven Bolus mit positiver Kohlenhydratangabe und dem stabil bestätigten Rückgang. ' +
+          'Weitere Boli ohne positive Kohlenhydratangabe starten den Peak nicht neu und werden ' +
+          'als Korrekturboli behandelt. Sie können den CGM-Verlauf trotzdem beeinflussen. Das ist ' +
           'beobachtend und keine Dosisempfehlung.',
       };
     });
@@ -400,7 +390,7 @@
 
   function formatBolusValue(analysis) {
     if (!analysis.bolus) {
-      return `kein mahlzeitennaher positiver Bolus (±${MEAL_BOLUS_ASSOCIATION_MINUTES} min) gefunden`;
+      return `kein mahlzeitennaher positiver Bolus mit positiver KH-Angabe (±${MEAL_BOLUS_ASSOCIATION_MINUTES} min) gefunden`;
     }
     const parts = [`${formatNumber(analysis.bolus[2], 2)} E`];
     if (Number.isFinite(analysis.bolusOffset)) {
@@ -434,12 +424,13 @@
     if (intro) {
       intro.textContent =
         'Der Mahlzeiten-Peak ist nicht mehr auf zwei Stunden begrenzt. Bis zu fünf Stunden ' +
-        'nach dem protokollierten Essensbeginn wird ein mahlzeitennaher positiver Bolus im ' +
-        `Bereich von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} Minuten zugeordnet. Ein Eintrag mit ` +
-        'Kohlenhydraten und ohne Korrekturkennzeichnung wird bevorzugt. Anschließend wird ein ' +
+        'nach dem protokollierten Essensbeginn wird ausschließlich ein mahlzeitennaher positiver ' +
+        `Bolus mit positiver Kohlenhydratangabe im Bereich von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} Minuten zugeordnet. ` +
+        'Ein positiver Bolus ohne Kohlenhydratangabe gilt immer als Korrekturbolus und kann den ' +
+        'Mahlzeitenbolus nicht ersetzen. Anschließend wird ein ' +
         'anhaltender Rückgangs-Proxy gesucht. Der Peak ist der höchste CGM-Wert zwischen diesem ' +
-        'Mahlzeitenbolus und dem Rückgang. Weitere positive Boli ohne neue protokollierte ' +
-        'Mahlzeit starten den Peak nicht neu; sie werden als mögliche Korrekturen behandelt. ' +
+        'Mahlzeitenbolus und dem Rückgang. Weitere Boli ohne positive Kohlenhydratangabe ' +
+        'starten den Peak nicht neu; sie werden als Korrekturboli behandelt. ' +
         'Solche Boli können den CGM-Verlauf trotzdem beeinflussen. Eine weitere protokollierte ' +
         'Mahlzeit beendet den Kontext. ' +
         `Der Rückgang wird mit ${DECLINE_CONFIRMATION_MINUTES} Minuten Hysterese, mindestens ` +
@@ -557,8 +548,8 @@
         peakRow.innerHTML =
           '<td>Mahlzeiten-Peakfenster</td>' +
           '<td>Mahlzeitenbolus → Rückgang · max. 5 h</td>' +
-          `<td>Der Peak beginnt beim zugeordneten positiven Bolus innerhalb von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} min um das Essen. ` +
-          'Weitere Boli ohne neue Mahlzeit starten den Peak nicht neu und gelten als mögliche Korrekturen; sie können den CGM-Verlauf dennoch beeinflussen.</td>';
+          `<td>Der Peak beginnt beim zugeordneten positiven Bolus mit positiver Kohlenhydratangabe innerhalb von ±${MEAL_BOLUS_ASSOCIATION_MINUTES} min um das Essen. ` +
+          'Boli ohne positive Kohlenhydratangabe sind Korrekturboli, starten den Peak nicht neu und können den CGM-Verlauf dennoch beeinflussen.</td>';
         body.appendChild(peakRow);
 
         const declineRow = document.createElement('tr');

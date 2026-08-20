@@ -113,6 +113,7 @@ class PersonalSitesContractTests(unittest.TestCase):
             "GC_DECLINE_DROP_MGDL",
             "nicht mehr auf zwei Stunden begrenzt",
             "mahlzeitennaher positiver Bolus",
+            "ohne Kohlenhydratangabe gilt immer als Korrekturbolus",
             "starten den Peak nicht neu",
             "mögliche Korrekturen",
             "2-h-Wert bleibt nur ein Referenzwert",
@@ -127,6 +128,8 @@ class PersonalSitesContractTests(unittest.TestCase):
             'id="insulin-action"',
             "Geschätzte effektive Glukosesenkungswirkung",
             "streng isolierte Korrekturereignisse",
+            "Korrekturboli ohne KH-Eingabe",
+            "werden immer als Korrekturbolus klassifiziert",
             "Aus Mahlzeitenboli wird keine pharmakodynamische Wirkzeit abgeleitet",
             "GC_INSULIN_ACTION_WINDOW_MINUTES",
             "ACTION_WINDOW_MINUTES = 300",
@@ -194,9 +197,12 @@ class PersonalSitesContractTests(unittest.TestCase):
         self.assertIn("nach Mahlzeitenbolus", peak_text)
         self.assertIn("120 min nach Essen", peak_text)
         self.assertIn("mögliche Korrektur", peak_text)
+        self.assertIn("blank-carbohydrate bolus cannot anchor a meal peak", peak_text)
         self.assertIn("CGM-Wendepunkt-Proxy", peak_text)
         insulin_text = paths[2].read_text(encoding="utf-8")
         self.assertIn("assertEveryDisplayedInsulinNumber", insulin_text)
+        self.assertIn("summaryLabels", insulin_text)
+        self.assertIn("ohne positive Kohlenhydratangabe", insulin_text)
         self.assertIn("insulin-action-oracle.cjs", insulin_text)
 
     def test_node_logic_suites(self) -> None:
