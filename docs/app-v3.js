@@ -66,7 +66,9 @@
                               loadScript('app-all-bolus-phases.js', () =>
                                 loadScript('app-compact-lists.js', () =>
                                   loadScript('app-insulin-page-ui.js', () =>
-                                    loadScript('app-version.js'),
+                                    loadScript('app-meal-page-ui.js', () =>
+                                      loadScript('app-version.js'),
+                                    ),
                                   ),
                                 ),
                               ),
