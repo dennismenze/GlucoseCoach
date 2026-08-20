@@ -2,6 +2,7 @@
   'use strict';
 
   const PROFILE_KEY = 'glucosecoach-profile-v1';
+  const VALID_WINDOWS = new Set(['7', '14', '30', '90', 'all']);
 
   function safeArray(value) {
     return Array.isArray(value) ? value : [];
@@ -16,14 +17,14 @@
     }
   }
 
-  function normalizedClinical() {
+  function normalizedClinical(value = gcState.clinical) {
     if (
       typeof GlucoseCoachV3 !== 'undefined' &&
       typeof GlucoseCoachV3.normalizeClinical === 'function'
     ) {
-      return GlucoseCoachV3.normalizeClinical(gcState.clinical || {});
+      return GlucoseCoachV3.normalizeClinical(value || {});
     }
-    return gcState.clinical || {};
+    return value || {};
   }
 
   function currentPayload() {
@@ -51,10 +52,28 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
+  function restoreCompleteCsv(payload) {
+    gcState.diary = safeArray(payload.diary);
+    gcState.clinical = normalizedClinical(payload.clinical);
+    const profile = payload.profile && typeof payload.profile === 'object' ? payload.profile : {};
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+
+    const requested = String(payload.ui?.windowDays ?? '90');
+    gcState.windowDays = VALID_WINDOWS.has(requested) ? requested : '90';
+    const select = document.querySelector('#window-days');
+    if (select) select.value = gcState.windowDays;
+
+    gcState.lastImport = null;
+    gcSave();
+    gcRender();
+    if (typeof gcShow === 'function') gcShow('overview');
+  }
+
   function ensureExportControls() {
     const api = root.GlucoseCoachExport;
     const csvButton = document.querySelector('#export-all');
-    if (!api || !csvButton) return;
+    const csvInput = document.querySelector('#import-complete-csv');
+    if (!api || !csvButton || !csvInput) return;
 
     csvButton.textContent = 'Vollständige CSV herunterladen';
     csvButton.onclick = () => {
@@ -65,67 +84,53 @@
       );
     };
 
-    let jsonButton = document.querySelector('#export-all-json');
-    if (!jsonButton) {
-      jsonButton = document.createElement('button');
-      jsonButton.type = 'button';
-      jsonButton.id = 'export-all-json';
-      jsonButton.className = 'secondary';
-      csvButton.insertAdjacentElement('afterend', jsonButton);
+    if (csvInput.dataset.completeCsvHandler !== 'true') {
+      csvInput.dataset.completeCsvHandler = 'true';
+      csvInput.onchange = async (event) => {
+        const progress = document.querySelector('#complete-csv-progress');
+        try {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const payload = api.parseCompleteCsv(await file.text());
+          restoreCompleteCsv(payload);
+          if (progress) {
+            progress.textContent =
+              `Wiederhergestellt: ${payload.diary.length} Tagebucheinträge und ` +
+              `${payload.clinical.cgm.length} CGM-Werte aus ${file.name}.`;
+          }
+        } catch (error) {
+          if (progress) progress.textContent = `Wiederherstellung fehlgeschlagen: ${error.message}`;
+          else alert(error.message);
+        }
+        event.target.value = '';
+      };
     }
-    jsonButton.textContent = 'Gesamtsicherung (JSON)';
-    jsonButton.onclick = () => {
-      downloadText(
-        `glucosecoach-gesamtsicherung-${dateFilenamePart()}.json`,
-        JSON.stringify(api.buildBackupPayload(currentPayload()), null, 2),
-        'application/json;charset=utf-8',
-      );
-    };
+  }
 
-    const backupInput = document.querySelector('#import-all');
-    if (!backupInput || backupInput.dataset.completeBackupHandler === 'true') return;
-    backupInput.dataset.completeBackupHandler = 'true';
-    backupInput.onchange = async (event) => {
-      try {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const payload = JSON.parse(await file.text());
-        if (!Array.isArray(payload.diary) || !payload.clinical) {
-          throw new Error('Ungültige Gesamtsicherung');
-        }
-        gcState.diary = payload.diary;
-        gcState.clinical = (
-          typeof GlucoseCoachV3 !== 'undefined' &&
-          typeof GlucoseCoachV3.normalizeClinical === 'function'
-        ) ? GlucoseCoachV3.normalizeClinical(payload.clinical) : payload.clinical;
-        if (payload.profile && typeof payload.profile === 'object') {
-          localStorage.setItem(PROFILE_KEY, JSON.stringify(payload.profile));
-        }
-        if (payload.ui?.windowDays !== undefined) {
-          const requested = String(payload.ui.windowDays);
-          gcState.windowDays = ['7', '14', '30', '90', 'all'].includes(requested)
-            ? requested
-            : '90';
-          const select = document.querySelector('#window-days');
-          if (select) select.value = gcState.windowDays;
-        }
-        gcState.lastImport = null;
-        gcSave();
-        gcRender();
-      } catch (error) {
-        alert(error.message);
-      }
-      event.target.value = '';
-    };
+  function removeLegacyJsonControls() {
+    for (const selector of [
+      '#export-all-json',
+      '#export-diary',
+      '#import-diary',
+      '#import-all',
+    ]) {
+      const element = document.querySelector(selector);
+      if (!element) continue;
+      const label = element.closest('label');
+      if (label) label.remove();
+      else element.remove();
+    }
   }
 
   function installBrowserPatch() {
     if (typeof document === 'undefined' || typeof gcRender !== 'function') return;
     const previousRender = gcRender;
-    gcRender = function renderWithCompleteExport() {
+    gcRender = function renderWithCompleteCsv() {
       previousRender();
+      removeLegacyJsonControls();
       ensureExportControls();
     };
+    removeLegacyJsonControls();
     ensureExportControls();
   }
 
