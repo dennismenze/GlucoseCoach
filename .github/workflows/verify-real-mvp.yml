@@ -21,28 +21,48 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Stamp visible test version
+        run: python scripts/stamp_site_version.py
+
       - name: Verify public site has no patient baseline
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js docs/app-meal-window.js docs/app-insulin-action.js; do
+          for file in \
+            docs/index.html docs/styles.css docs/site-version.js docs/app-v3.js \
+            docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js \
+            docs/app-ui-contract.js docs/app-meal-window.js docs/app-meal-list-ui.js \
+            docs/app-insulin-action.js docs/app-insulin-summary-core.js \
+            docs/app-insulin-summary-ui.js docs/app-export-core.js docs/app-export-ui.js; do
             test -s "$file"
           done
+          test -s scripts/stamp_site_version.py
           python - <<'PY'
           from pathlib import Path
 
           paths = (
               "docs/index.html",
               "docs/styles.css",
+              "docs/site-version.js",
               "docs/app-v3.js",
               "docs/app-v3-core.js",
               "docs/app-importers.js",
               "docs/app-importers-context.js",
               "docs/app-ui-contract.js",
               "docs/app-meal-window.js",
+              "docs/app-meal-list-ui.js",
               "docs/app-insulin-action.js",
+              "docs/app-insulin-summary-core.js",
+              "docs/app-insulin-summary-ui.js",
+              "docs/app-export-core.js",
+              "docs/app-export-ui.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
+          index = Path("docs/index.html").read_text(encoding="utf-8")
+          export_text = "\n".join(
+              Path(path).read_text(encoding="utf-8")
+              for path in ("docs/app-export-core.js", "docs/app-export-ui.js")
+          )
           required = [
               "Ein neuer Browser startet ohne Gesundheitsdaten",
               "Noch keine persönlichen CGM-Daten",
@@ -53,12 +73,22 @@ jobs:
               "Mahlzeitenanalyse",
               "Insulinwirkung",
               "localStorage",
+              "site-version.js",
               "app-v3-core.js",
               "app-importers.js",
               "app-importers-context.js",
               "app-ui-contract.js",
               "app-meal-window.js",
+              "app-meal-list-ui.js",
               "app-insulin-action.js",
+              "app-insulin-summary-core.js",
+              "app-insulin-summary-ui.js",
+              "app-export-core.js",
+              "app-export-ui.js",
+              "Vollständige CSV wiederherstellen",
+              "parseCompleteCsv",
+              "glucosecoach-csv-v2",
+              "Version ${build.version}",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
@@ -98,15 +128,30 @@ jobs:
               raise SystemExit(f"Missing personal-local site contract: {missing}")
           if leaks:
               raise SystemExit(f"Published patient baseline leaked into site: {leaks}")
-          print("Personal-local meal and insulin-action site verified")
+          if "JSON" in index:
+              raise SystemExit("User-facing page still exposes a JSON route")
+          redundant_export_tokens = [
+              "Rohdaten_JSON", "buildBackupPayload", "export-all-json", "Zeitstempel_lokal",
+          ]
+          present = [value for value in redundant_export_tokens if value in export_text]
+          if present:
+              raise SystemExit(f"Redundant export routes remain: {present}")
+          print("Personal-local CSV-only meal and insulin-action site verified")
           PY
 
       - name: Syntax-check browser and E2E modules
         shell: bash
         run: |
           set -euo pipefail
+          node --check docs/site-version.js
+          node --check docs/app-v3.js
+          node --check docs/app-export-core.js
+          node --check docs/app-export-ui.js
           node --check docs/app-meal-window.js
+          node --check docs/app-meal-list-ui.js
           node --check docs/app-insulin-action.js
+          node --check docs/app-insulin-summary-core.js
+          node --check docs/app-insulin-summary-ui.js
           node --check tests/sites_logic_test.cjs
           node --check tests/postprandial_peak_test.cjs
           node --check tests/insulin_action_test.cjs
@@ -116,6 +161,9 @@ jobs:
           node --check e2e/glucosecoach.e2e.spec.cjs
           node --check e2e/postprandial-peak.e2e.spec.cjs
           node --check e2e/insulin-action.e2e.spec.cjs
+          node --check e2e/complete-export.e2e.spec.cjs
+          node --check e2e/insulin-summary-ui.e2e.spec.cjs
+          node --check e2e/meal-list-ui.e2e.spec.cjs
           node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
 
