@@ -52,25 +52,6 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
-  function removeControl(id) {
-    const control = document.querySelector(`#${id}`);
-    if (!control) return;
-    const label = control.closest('label');
-    if (label) label.remove();
-    else control.remove();
-  }
-
-  function removeLegacyJsonControls() {
-    for (const id of ['export-all-json', 'export-diary', 'import-diary', 'import-all']) {
-      removeControl(id);
-    }
-    const paragraph = document.querySelector('#diary article.card.wide > p.muted');
-    if (paragraph) {
-      paragraph.textContent =
-        'Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel kann die vollständige CSV exportiert und wieder importiert werden.';
-    }
-  }
-
   function restoreCompleteCsv(file, api) {
     return file.text().then((source) => {
       const payload = api.parseCompleteCsv(source);
@@ -99,25 +80,23 @@
     });
   }
 
-  function ensureCsvImport(csvButton, api) {
-    let label = document.querySelector('#import-complete-csv-label');
-    let input = document.querySelector('#import-complete-csv');
-    if (!label) {
-      label = document.createElement('label');
-      label.id = 'import-complete-csv-label';
-      label.className = 'file-button';
-      label.textContent = 'Vollständige CSV importieren';
-      input = document.createElement('input');
-      input.id = 'import-complete-csv';
-      input.type = 'file';
-      input.accept = '.csv,text/csv';
-      input.hidden = true;
-      label.appendChild(input);
-      csvButton.insertAdjacentElement('afterend', label);
-    }
-    if (!input || input.dataset.bound === 'true') return;
-    input.dataset.bound = 'true';
-    input.addEventListener('change', async (event) => {
+  function bindExportControls() {
+    const api = root.GlucoseCoachExport;
+    const csvButton = document.querySelector('#export-all');
+    const csvInput = document.querySelector('#import-complete-csv');
+    if (!api || !csvButton || !csvInput) return;
+
+    csvButton.onclick = () => {
+      downloadText(
+        `glucosecoach-vollstaendig-${dateFilenamePart()}.csv`,
+        api.buildCompleteCsv(currentPayload()),
+        'text/csv;charset=utf-8',
+      );
+    };
+
+    if (csvInput.dataset.bound === 'true') return;
+    csvInput.dataset.bound = 'true';
+    csvInput.addEventListener('change', async (event) => {
       const progress = document.querySelector('#import-progress');
       try {
         const file = event.target.files?.[0];
@@ -135,32 +114,14 @@
     });
   }
 
-  function ensureExportControls() {
-    removeLegacyJsonControls();
-    const api = root.GlucoseCoachExport;
-    const csvButton = document.querySelector('#export-all');
-    if (!api || !csvButton) return;
-
-    csvButton.textContent = 'Vollständige CSV herunterladen';
-    csvButton.onclick = () => {
-      downloadText(
-        `glucosecoach-vollstaendig-${dateFilenamePart()}.csv`,
-        api.buildCompleteCsv(currentPayload()),
-        'text/csv;charset=utf-8',
-      );
-    };
-
-    ensureCsvImport(csvButton, api);
-  }
-
   function installBrowserPatch() {
     if (typeof document === 'undefined' || typeof gcRender !== 'function') return;
     const previousRender = gcRender;
     gcRender = function renderWithCompleteCsv() {
       previousRender();
-      ensureExportControls();
+      bindExportControls();
     };
-    ensureExportControls();
+    bindExportControls();
   }
 
   if (typeof document !== 'undefined') installBrowserPatch();
