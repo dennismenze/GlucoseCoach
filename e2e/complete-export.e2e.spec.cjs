@@ -94,6 +94,13 @@ async function storedState(page) {
   }));
 }
 
+async function expectEmptyDatasets(page) {
+  const stored = await storedState(page);
+  expect(stored.diary).toEqual([]);
+  expect(stored.clinical.cgm || []).toEqual([]);
+  expect(stored.clinical.boluses || []).toEqual([]);
+}
+
 function expectStoredPayload(stored, payload) {
   expect(stored.profile).toEqual(payload.profile);
   expect(stored.diary).toEqual(payload.diary);
@@ -142,6 +149,8 @@ test('browser exports, selects and drops the complete CSV ZIP round-trip', async
   });
 
   await page.addInitScript((stored) => {
+    if (sessionStorage.getItem('complete-export-seeded') === 'true') return;
+    sessionStorage.setItem('complete-export-seeded', 'true');
     localStorage.setItem('glucosecoach-profile-v1', JSON.stringify(stored.profile));
     localStorage.setItem('glucosecoach-diary-v1', JSON.stringify(stored.diary));
     localStorage.setItem('glucosecoach-clinical-v1', JSON.stringify(stored.clinical));
@@ -185,6 +194,7 @@ test('browser exports, selects and drops the complete CSV ZIP round-trip', async
   expect(companionSource).not.toContain('"Kontextdaten"');
 
   await clearLocalData(page);
+  await expectEmptyDatasets(page);
   await page.locator('#csv-files').setInputFiles({
     name: download.suggestedFilename(),
     mimeType: 'application/zip',
@@ -195,6 +205,7 @@ test('browser exports, selects and drops the complete CSV ZIP round-trip', async
   expectStoredPayload(await storedState(page), payload);
 
   await clearLocalData(page);
+  await expectEmptyDatasets(page);
   await page.evaluate((base64) => {
     const binary = atob(base64);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
