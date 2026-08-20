@@ -2,14 +2,8 @@
 
 const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
-const {
-  CSV_SCHEMA,
-  CLINICAL_TYPES,
-  EXPORT_COLUMNS,
-  buildCompleteCsv,
-  buildCompleteExportRows,
-  parseCompleteCsv,
-} = require('../docs/app-export-core.js');
+const exportCore = require('../docs/app-export-core.js');
+const zipExchange = require('../docs/app-zip-core.js');
 
 const MINUTE_MS = 60_000;
 
@@ -81,49 +75,93 @@ async function clickTab(page, id) {
   await expect(page.locator(`#${id}`)).toHaveClass(/\bactive\b/);
 }
 
-test('single canonical CSV preserves every local dataset without redundant rows', () => {
-  const payload = completePayload();
-  const rows = buildCompleteExportRows(payload);
-  const dataRows = rows.filter((row) =>
-    ['Klinische Daten', 'Kontextdaten'].includes(row.section),
-  );
+async function clearLocalData(page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('glucosecoach-profile-v1');
+    localStorage.setItem('glucosecoach-diary-v1', '[]');
+    localStorage.setItem('glucosecoach-clinical-v1', '{}');
+  });
+  await page.reload();
+  await expect(page.locator('#export-all')).toHaveText('CSV-ZIP herunterladen');
+  await clickTab(page, 'import-data');
+}
 
-  expect(dataRows.map((row) => row.dataType)).toEqual(CLINICAL_TYPES.map(([, label]) => label));
-  expect(rows.some((row) => row.section === 'Bestand')).toBe(false);
-  expect(EXPORT_COLUMNS.map(([, label]) => label)).not.toContain('Rohdaten_JSON');
-  expect(EXPORT_COLUMNS.map(([, label]) => label)).not.toContain('Zeitstempel_lokal');
-  expect(EXPORT_COLUMNS.map(([, label]) => label).some((label) => /JSON/i.test(label))).toBe(false);
+async function storedState(page) {
+  return page.evaluate(() => ({
+    profile: JSON.parse(localStorage.getItem('glucosecoach-profile-v1') || '{}'),
+    diary: JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),
+    clinical: JSON.parse(localStorage.getItem('glucosecoach-clinical-v1') || '{}'),
+    windowDays: document.querySelector('#window-days')?.value,
+  }));
+}
 
-  const csv = buildCompleteCsv(payload);
-  expect(csv.startsWith('\uFEFF')).toBe(true);
-  const restored = parseCompleteCsv(csv);
-  expect(restored.schema).toBe(CSV_SCHEMA);
-  expect(restored.version).toBe(payload.version);
-  expect(restored.profile).toEqual(payload.profile);
-  expect(restored.ui).toEqual(payload.ui);
-  expect(restored.diary).toEqual(payload.diary);
-  for (const [key] of CLINICAL_TYPES) {
-    expect(restored.clinical[key], `round trip for ${key}`).toEqual(payload.clinical[key]);
+async function expectEmptyDatasets(page) {
+  const stored = await storedState(page);
+  expect(stored.diary).toEqual([]);
+  expect(stored.clinical.cgm || []).toEqual([]);
+  expect(stored.clinical.boluses || []).toEqual([]);
+}
+
+function expectStoredPayload(stored, payload) {
+  expect(stored.profile).toEqual(payload.profile);
+  expect(stored.diary).toEqual(payload.diary);
+  for (const [key] of exportCore.CLINICAL_TYPES) {
+    expect(stored.clinical[key], `browser restore for ${key}`).toEqual(payload.clinical[key]);
   }
-  expect(restored.clinical.imports).toEqual(payload.clinical.imports);
-  expect(restored.clinical.updatedAt).toBe(payload.clinical.updatedAt);
+  expect(stored.clinical.imports).toEqual(payload.clinical.imports);
+  expect(stored.clinical.updatedAt).toBe(payload.clinical.updatedAt);
+  expect(stored.windowDays).toBe('all');
+}
+
+test('ZIP contract contains import-compatible CSV files without duplicated clinical rows', async () => {
+  const payload = completePayload();
+  const files = zipExchange.buildExchangeFiles(payload, exportCore);
+  expect(files.map((file) => file.name)).toEqual([
+    ...zipExchange.IMPORT_FILE_DEFINITIONS.map((definition) => definition.filename),
+    zipExchange.COMPANION_FILENAME,
+  ]);
+
+  for (const definition of zipExchange.IMPORT_FILE_DEFINITIONS) {
+    const file = files.find((candidate) => candidate.name === definition.filename);
+    const header = file.text.replace(/^\uFEFF/, '').split(/\r?\n/)[1];
+    expect(header).toBe(definition.headers.map((value) => `"${value}"`).join(','));
+  }
+
+  const companionFile = files.find((file) => file.name === zipExchange.COMPANION_FILENAME);
+  expect(companionFile.text).not.toContain('"Klinische Daten"');
+  expect(companionFile.text).not.toContain('"Kontextdaten"');
+  const companion = exportCore.parseCompleteCsv(companionFile.text);
+  expect(companion.profile).toEqual(payload.profile);
+  expect(companion.diary).toEqual(payload.diary);
+  expect(companion.clinical.imports).toEqual(payload.clinical.imports);
+  for (const [key] of exportCore.CLINICAL_TYPES) expect(companion.clinical[key]).toEqual([]);
+
+  const archive = await zipExchange.buildExchangeZip(payload, exportCore, { compress: true });
+  const entries = await zipExchange.extractZip(archive);
+  expect(entries.map((entry) => entry.name)).toEqual(files.map((file) => file.name));
 });
 
-test('browser offers only the complete CSV and restores it without JSON controls', async ({ page }) => {
+test('browser exports, selects and drops the complete CSV ZIP round-trip', async ({ page }) => {
   const payload = completePayload();
+  const browserErrors = [];
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') browserErrors.push(message.text());
+  });
+
   await page.addInitScript((stored) => {
+    if (sessionStorage.getItem('complete-export-seeded') === 'true') return;
+    sessionStorage.setItem('complete-export-seeded', 'true');
     localStorage.setItem('glucosecoach-profile-v1', JSON.stringify(stored.profile));
     localStorage.setItem('glucosecoach-diary-v1', JSON.stringify(stored.diary));
     localStorage.setItem('glucosecoach-clinical-v1', JSON.stringify(stored.clinical));
   }, payload);
 
   await page.goto('/');
-  await expect(page.locator('#import-complete-csv')).toBeAttached();
-  await expect(page.locator('#export-all')).toHaveText('Vollständige CSV herunterladen');
-  await expect(page.locator('#export-all-json')).toHaveCount(0);
-  await expect(page.locator('#export-diary')).toHaveCount(0);
-  await expect(page.locator('#import-diary')).toHaveCount(0);
-  await expect(page.locator('#import-all')).toHaveCount(0);
+  await expect(page.locator('#export-all')).toHaveText('CSV-ZIP herunterladen');
+  await expect(page.locator('#import-complete-csv-label')).toHaveCount(0);
+  await expect(page.locator('#csv-files')).toHaveAttribute('accept', /\.zip/);
+  await expect(page.locator('#import-csv')).toContainText('CSV/ZIP');
   await expect(page.locator('body')).not.toContainText('JSON');
 
   await clickTab(page, 'overview');
@@ -135,37 +173,58 @@ test('browser offers only the complete CSV and restores it without JSON controls
     page.locator('#export-all').click(),
   ]);
   expect(download.suggestedFilename()).toMatch(
-    /^glucosecoach-vollstaendig-\d{4}-\d{2}-\d{2}\.csv$/,
+    /^glucosecoach-csv-export-\d{4}-\d{2}-\d{2}\.zip$/,
   );
   const downloadPath = await download.path();
-  const csv = await fs.readFile(downloadPath, 'utf8');
-  expect(csv).not.toContain('Rohdaten_JSON');
-  expect(csv).not.toContain('Zeitstempel_lokal');
-  const parsed = parseCompleteCsv(csv);
-  expect(parsed.profile).toEqual(payload.profile);
-
-  await page.evaluate(() => {
-    localStorage.removeItem('glucosecoach-profile-v1');
-    localStorage.setItem('glucosecoach-diary-v1', '[]');
-    localStorage.setItem('glucosecoach-clinical-v1', '{}');
-  });
-  await page.reload();
-  await expect(page.locator('#import-complete-csv')).toBeAttached();
-  await page.locator('#import-complete-csv').setInputFiles(downloadPath);
-  await expect(page.locator('#import-progress')).toContainText('Vollständige CSV importiert');
-
-  const stored = await page.evaluate(() => ({
-    profile: JSON.parse(localStorage.getItem('glucosecoach-profile-v1') || '{}'),
-    diary: JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),
-    clinical: JSON.parse(localStorage.getItem('glucosecoach-clinical-v1') || '{}'),
-    windowDays: document.querySelector('#window-days')?.value,
-  }));
-  expect(stored.profile).toEqual(payload.profile);
-  expect(stored.diary).toEqual(payload.diary);
-  for (const [key] of CLINICAL_TYPES) {
-    expect(stored.clinical[key], `browser restore for ${key}`).toEqual(payload.clinical[key]);
+  const archive = await fs.readFile(downloadPath);
+  const entries = await zipExchange.extractZip(archive);
+  expect(entries.map((entry) => entry.name)).toEqual([
+    ...zipExchange.IMPORT_FILE_DEFINITIONS.map((definition) => definition.filename),
+    zipExchange.COMPANION_FILENAME,
+  ]);
+  for (const definition of zipExchange.IMPORT_FILE_DEFINITIONS) {
+    const entry = entries.find((candidate) => candidate.name === definition.filename);
+    const source = new TextDecoder().decode(entry.bytes);
+    expect(source.split(/\r?\n/)[1]).toBe(
+      definition.headers.map((value) => `"${value}"`).join(','),
+    );
   }
-  expect(stored.clinical.imports).toEqual(payload.clinical.imports);
-  expect(stored.clinical.updatedAt).toBe(payload.clinical.updatedAt);
-  expect(stored.windowDays).toBe('all');
+  const companionEntry = entries.find((entry) => entry.name === zipExchange.COMPANION_FILENAME);
+  const companionSource = new TextDecoder().decode(companionEntry.bytes);
+  expect(companionSource).not.toContain('"Klinische Daten"');
+  expect(companionSource).not.toContain('"Kontextdaten"');
+
+  await clearLocalData(page);
+  await expectEmptyDatasets(page);
+  await page.locator('#csv-files').setInputFiles({
+    name: download.suggestedFilename(),
+    mimeType: 'application/zip',
+    buffer: archive,
+  });
+  await page.locator('#import-csv').click();
+  await expect(page.locator('#import-progress')).toContainText('CSV-ZIP vollständig importiert');
+  expectStoredPayload(await storedState(page), payload);
+
+  await clearLocalData(page);
+  await expectEmptyDatasets(page);
+  await page.evaluate((base64) => {
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const file = new File([bytes], 'omnipod-export.zip', { type: 'application/zip' });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    document.querySelector('.import-drop').dispatchEvent(new DragEvent('dragenter', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: transfer,
+    }));
+    document.querySelector('.import-drop').dispatchEvent(new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: transfer,
+    }));
+  }, archive.toString('base64'));
+  await expect(page.locator('#import-progress')).toContainText('CSV-ZIP vollständig importiert');
+  expectStoredPayload(await storedState(page), payload);
+  expect(browserErrors).toEqual([]);
 });

@@ -5,17 +5,23 @@
     if (typeof module !== 'undefined' && module.exports) {
       const mealWindow = require('./app-meal-window.js');
       const insulinAction = require('./app-insulin-action.js');
+      const importers = require('./app-importers-context.js');
       const exportCore = require('./app-export-core.js');
+      const zipExchange = require('./app-zip-core.js');
       const insulinSummaryCore = require('./app-insulin-summary-core.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
-        ...require('./app-importers-context.js'),
+        ...importers,
         ...require('./app-ui-contract.js'),
         ...mealWindow,
         ...insulinAction,
         ...exportCore,
+        ...zipExchange,
         ...insulinSummaryCore,
+        parseClinicalCsv: importers.parseClinicalCsv,
+        mergeClinical: importers.mergeClinical,
+        normalizeClinical: importers.normalizeClinical,
       };
     }
     return;
@@ -44,11 +50,13 @@
             loadScript('app-meal-window.js', () =>
               loadScript('app-insulin-action.js', () =>
                 loadScript('app-export-core.js', () =>
-                  loadScript('app-export-ui.js', () =>
-                    loadScript('app-insulin-summary-core.js', () =>
-                      loadScript('app-insulin-summary-ui.js', () =>
-                        loadScript('app-compact-lists.js', () =>
-                          loadScript('app-version.js'),
+                  loadScript('app-zip-core.js', () =>
+                    loadScript('app-export-ui.js', () =>
+                      loadScript('app-insulin-summary-core.js', () =>
+                        loadScript('app-insulin-summary-ui.js', () =>
+                          loadScript('app-compact-lists.js', () =>
+                            loadScript('app-version.js'),
+                          ),
                         ),
                       ),
                     ),
