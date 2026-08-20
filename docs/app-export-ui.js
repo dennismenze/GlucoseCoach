@@ -109,7 +109,6 @@
 
   function removeLegacyJsonControls() {
     for (const selector of [
-      '#export-all-json',
       '#export-diary',
       '#import-diary',
       '#import-all',
