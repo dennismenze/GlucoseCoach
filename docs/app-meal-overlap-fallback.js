@@ -418,6 +418,10 @@
     const note = document.querySelector('#food-comparison-note');
     if (note) {
       note.textContent =
+        'Mediane werden nur aus persönlichen, vollständig auswertbaren Ereignissen berechnet. ' +
+        'Der Mahlzeiten-Peak darf weiterhin mehr als zwei oder drei Stunden nach dem Essen liegen, ' +
+        'sofern vorher kein stabil bestätigter Rückgang und keine neue Mahlzeit vorliegt. ' +
+        'Spätere Boli ohne positive Kohlenhydratangabe ersetzen den zugeordneten Mahlzeitenbolus nicht. ' +
         'Die 2-h-Änderung verwendet normalerweise den CGM-Wert um 120 Minuten. Beginnt vorher ' +
         'ein weiterer Mahlzeitenbolus mit positiver Kohlenhydratangabe, endet das Fenster dort ' +
         'und der höchste CGM-Wert bis unmittelbar davor wird als gekennzeichneter Ersatzwert ' +
