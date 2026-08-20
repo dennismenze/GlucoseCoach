@@ -611,27 +611,6 @@
       };
     }
 
-    const backupInput = document.querySelector('#import-all');
-    if (backupInput) {
-      backupInput.onchange = async function extendedBackupImport(event) {
-        try {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          const payload = JSON.parse(await file.text());
-          if (!Array.isArray(payload.diary) || !payload.clinical) {
-            throw new Error('Ungültige Gesamtsicherung');
-          }
-          gcState.diary = payload.diary;
-          gcState.clinical = normalizeClinical(payload.clinical);
-          gcState.lastImport = null;
-          gcSave();
-          gcRender();
-        } catch (error) {
-          alert(error.message);
-        }
-        event.target.value = '';
-      };
-    }
 
     if (previousLoad) {
       gcLoad();

@@ -52,24 +52,6 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
-  function removeControl(id) {
-    const control = document.querySelector(`#${id}`);
-    if (!control) return;
-    const label = control.closest('label');
-    if (label) label.remove();
-    else control.remove();
-  }
-
-  function removeLegacyJsonControls() {
-    for (const id of ['export-all-json', 'export-diary', 'import-diary', 'import-all']) {
-      removeControl(id);
-    }
-    const paragraph = document.querySelector('#diary article.card.wide > p.muted');
-    if (paragraph) {
-      paragraph.textContent =
-        'Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel kann die vollständige CSV exportiert und wieder importiert werden.';
-    }
-  }
 
   function restoreCompleteCsv(file, api) {
     return file.text().then((source) => {
@@ -136,7 +118,6 @@
   }
 
   function ensureExportControls() {
-    removeLegacyJsonControls();
     const api = root.GlucoseCoachExport;
     const csvButton = document.querySelector('#export-all');
     if (!api || !csvButton) return;
