@@ -244,20 +244,21 @@
       ? peakRows.reduce((best, row) => row[1] > best[1] ? row : best, peakRows[0])
       : null;
     const bolusStartRow = bolus ? closest(windowRows, bolus[0]) : null;
+    const peakComplete = Boolean(bolus && turn && peakRow);
 
     let status = 'partial-analysis';
     if (!bolus) status = bolusesInContext.length ? 'missing-meal-bolus' : 'missing-bolus';
     else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
     else if (!turn) status = 'no-stable-decline';
-    else if (!peakRow || !two) status = 'partial-analysis';
+    else if (!peakComplete) status = 'partial-analysis';
+    else if (!two) status = 'complete-missing-two-hour';
     else status = 'complete';
-
-    const complete = status === 'complete';
 
     return {
       entry,
       minute,
-      complete,
+      complete: peakComplete,
+      peakComplete,
       status,
       baseline,
       minutesToRise: rise ? rise[0] - minute : null,
@@ -270,6 +271,7 @@
         : null,
       twoHour: two?.[1] ?? null,
       twoHourDelta: two ? two[1] - baseline : null,
+      twoHourAvailable: Boolean(two),
       bolus,
       mealBolus: bolus,
       bolusOffset: bolus ? bolus[0] - minute : null,
@@ -497,6 +499,11 @@
     items.forEach((item, index) => {
       const analysis = analyses[index];
       if (!analysis) return;
+      const status = item.querySelector('.status');
+      if (status && analysis.status === 'complete-missing-two-hour') {
+        status.className = 'status ok';
+        status.textContent = 'vollständig · 2-h-Wert fehlt';
+      }
       const cells = item.querySelectorAll('.analysis-grid > div');
       if (cells.length < 6) return;
 
