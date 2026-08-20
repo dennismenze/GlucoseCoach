@@ -130,9 +130,20 @@
     return low;
   }
 
+  function upperBound(rows, target) {
+    let low = 0;
+    let high = rows.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (rows[middle][0] <= target) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+
   function rowsBetween(rows, start, end) {
     const first = lowerBound(rows, start);
-    const last = lowerBound(rows, end + Number.EPSILON);
+    const last = upperBound(rows, end);
     return rows.slice(first, last);
   }
 
