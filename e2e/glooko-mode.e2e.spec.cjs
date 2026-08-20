@@ -83,6 +83,8 @@ test('native Glooko ZIP augments the still-editable local diary', async ({ page 
   await page.goto('/');
   await expect(page.locator('#glooko-source-control')).toHaveCount(1);
   await expect(page.locator('#glooko-meal-source')).toHaveCount(0);
+  await page.locator('nav button[data-panel="diary"]').click();
+  await expect(page.locator('#diary')).toHaveClass(/\bactive\b/);
   await expect(page.locator('#diary-form')).toBeVisible();
 
   await page.locator('nav button[data-panel="import-data"]').click();
