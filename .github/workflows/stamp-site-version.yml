@@ -1,0 +1,46 @@
+name: Stamp visible site version
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/version.js'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stamp-visible-site-version
+  cancel-in-progress: true
+
+jobs:
+  stamp:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Determine and insert version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python scripts/stamp_site_version.py --sha "$GITHUB_SHA" --run-number "$GITHUB_RUN_NUMBER")"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+      - name: Commit generated version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/version.js; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/version.js
+          git commit -m "chore: stamp site version ${{ steps.version.outputs.value }}"
+          git push

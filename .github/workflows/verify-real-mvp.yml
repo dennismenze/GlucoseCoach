@@ -21,11 +21,30 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Insert CI-derived visible version
+        run: python scripts/stamp_site_version.py --sha "$GITHUB_SHA" --run-number "$GITHUB_RUN_NUMBER"
+
       - name: Verify public site has no patient baseline
         shell: bash
         run: |
           set -euo pipefail
-          for file in docs/index.html docs/styles.css docs/app-v3.js docs/app-v3-core.js docs/app-importers.js docs/app-importers-context.js docs/app-ui-contract.js docs/app-meal-window.js docs/app-insulin-action.js; do
+          for file in \
+            docs/index.html \
+            docs/styles.css \
+            docs/app-v3.js \
+            docs/app-v3-core.js \
+            docs/app-importers.js \
+            docs/app-importers-context.js \
+            docs/app-ui-contract.js \
+            docs/app-meal-window.js \
+            docs/app-insulin-action.js \
+            docs/app-export-core.js \
+            docs/app-export-ui.js \
+            docs/app-insulin-summary-core.js \
+            docs/app-insulin-summary-ui.js \
+            docs/app-compact-lists.js \
+            docs/version.js \
+            docs/app-version.js; do
             test -s "$file"
           done
           python - <<'PY'
@@ -41,6 +60,13 @@ jobs:
               "docs/app-ui-contract.js",
               "docs/app-meal-window.js",
               "docs/app-insulin-action.js",
+              "docs/app-export-core.js",
+              "docs/app-export-ui.js",
+              "docs/app-insulin-summary-core.js",
+              "docs/app-insulin-summary-ui.js",
+              "docs/app-compact-lists.js",
+              "docs/version.js",
+              "docs/app-version.js",
           )
           text = "\n".join(Path(path).read_text(encoding="utf-8") for path in paths)
           required = [
@@ -59,6 +85,17 @@ jobs:
               "app-ui-contract.js",
               "app-meal-window.js",
               "app-insulin-action.js",
+              "app-export-core.js",
+              "app-export-ui.js",
+              "app-compact-lists.js",
+              "version.js",
+              "app-version.js",
+              "glucosecoach-csv-v1",
+              "Vollständige CSV herunterladen",
+              "Vollständige CSV importieren",
+              "meal-events-disclosure",
+              "diary-entries-disclosure",
+              "GLUCOSECOACH_VERSION",
               "insulin_data_*.csv",
               "basal_data_*.csv",
               "bg_data_*.csv",
@@ -98,15 +135,30 @@ jobs:
               raise SystemExit(f"Missing personal-local site contract: {missing}")
           if leaks:
               raise SystemExit(f"Published patient baseline leaked into site: {leaks}")
-          print("Personal-local meal and insulin-action site verified")
+
+          export_core = Path("docs/app-export-core.js").read_text(encoding="utf-8")
+          redundant = [
+              value for value in ("Rohdaten_JSON", "Zeitstempel_lokal", "buildBackupPayload")
+              if value in export_core
+          ]
+          if redundant:
+              raise SystemExit(f"Redundant export contract returned: {redundant}")
+          print("Personal-local meal, CSV, compact-list and version site verified")
           PY
 
       - name: Syntax-check browser and E2E modules
         shell: bash
         run: |
           set -euo pipefail
+          node --check docs/app-v3.js
           node --check docs/app-meal-window.js
           node --check docs/app-insulin-action.js
+          node --check docs/app-export-core.js
+          node --check docs/app-export-ui.js
+          node --check docs/app-insulin-summary-core.js
+          node --check docs/app-insulin-summary-ui.js
+          node --check docs/app-compact-lists.js
+          node --check docs/app-version.js
           node --check tests/sites_logic_test.cjs
           node --check tests/postprandial_peak_test.cjs
           node --check tests/insulin_action_test.cjs
@@ -116,8 +168,12 @@ jobs:
           node --check e2e/glucosecoach.e2e.spec.cjs
           node --check e2e/postprandial-peak.e2e.spec.cjs
           node --check e2e/insulin-action.e2e.spec.cjs
+          node --check e2e/complete-export.e2e.spec.cjs
+          node --check e2e/insulin-summary-ui.e2e.spec.cjs
+          node --check e2e/compact-version.e2e.spec.cjs
           node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
+          python -m py_compile scripts/stamp_site_version.py
 
       - name: Run repository validator
         shell: bash
