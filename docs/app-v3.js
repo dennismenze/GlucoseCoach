@@ -5,6 +5,8 @@
     if (typeof module !== 'undefined' && module.exports) {
       const mealWindow = require('./app-meal-window.js');
       const insulinAction = require('./app-insulin-action.js');
+      const exportCore = require('./app-export-core.js');
+      const insulinSummaryCore = require('./app-insulin-summary-core.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -12,6 +14,8 @@
         ...require('./app-ui-contract.js'),
         ...mealWindow,
         ...insulinAction,
+        ...exportCore,
+        ...insulinSummaryCore,
       };
     }
     return;
@@ -33,7 +37,17 @@
     loadScript('app-importers.js', () =>
       loadScript('app-importers-context.js', () =>
         loadScript('app-ui-contract.js', () =>
-          loadScript('app-meal-window.js', () => loadScript('app-insulin-action.js')),
+          loadScript('app-meal-window.js', () =>
+            loadScript('app-insulin-action.js', () =>
+              loadScript('app-export-core.js', () =>
+                loadScript('app-export-ui.js', () =>
+                  loadScript('app-insulin-summary-core.js', () =>
+                    loadScript('app-insulin-summary-ui.js'),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     ),
