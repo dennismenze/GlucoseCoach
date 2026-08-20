@@ -1,0 +1,1 @@
+window.GLUCOSECOACH_VERSION = 'v2026.08.20.0-source';
