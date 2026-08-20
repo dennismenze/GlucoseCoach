@@ -15,7 +15,10 @@
         <h1>GlucoseCoach</h1>
         <p class="lead">Ein neuer Browser startet ohne Gesundheitsdaten. Tagebuch, CGM- und Bolusdaten werden ausschließlich in diesem Browser gespeichert und daraus lokal neu berechnet. Es werden keine persönlichen Ausgangswerte mit der öffentlichen Website ausgeliefert.</p>
       </div>
-      <span id="header-badge" class="badge">Lokales Profil</span>
+      <div class="header-meta">
+        <span id="header-badge" class="badge">Lokales Profil</span>
+        <span id="app-version" class="version-badge">Version 2026.08.20.0 · develop</span>
+      </div>
     </header>
 
     <nav aria-label="Bereiche">
@@ -79,6 +82,7 @@
         </article>
         <article class="card full">
           <h2>Einzelne Einträge</h2>
+          <p class="muted compact">Die Liste startet geschlossen. Mahlzeiten lassen sich nach Datum filtern und einzeln aufklappen.</p>
           <div id="meal-events" class="analysis-list"></div>
         </article>
         <article class="card wide">
@@ -158,7 +162,7 @@
       <div class="grid">
         <article class="card wide">
           <h2>Kontext erfassen</h2>
-          <p class="muted">Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel kann eine Gesamtsicherung exportiert und wieder importiert werden.</p>
+          <p class="muted">Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel steht unter „CSV-Daten“ eine vollständige CSV zum Herunterladen und Wiederherstellen bereit.</p>
           <form id="diary-form">
             <div class="form-grid">
               <label>Zeitpunkt<input id="when" type="datetime-local" required></label>
@@ -176,14 +180,13 @@
             </div>
             <div class="actions">
               <button class="primary" type="submit">Eintrag speichern und neu berechnen</button>
-              <button class="secondary" type="button" id="export-diary">Tagebuch-JSON exportieren</button>
-              <label class="file-button">Tagebuch-JSON importieren<input id="import-diary" type="file" accept="application/json" hidden></label>
               <button class="danger" type="button" id="clear-diary">Alle Tagebucheinträge löschen</button>
             </div>
           </form>
         </article>
         <aside class="card side">
           <h2>Einträge</h2>
+          <p class="muted compact">Die Liste startet geschlossen. Einträge lassen sich nach Datum filtern und einzeln aufklappen.</p>
           <p id="empty-diary" class="muted">Noch keine lokalen Einträge.</p>
           <div id="entries" class="entries"></div>
         </aside>
@@ -210,14 +213,15 @@
           <h2>Lokaler Datenbestand</h2>
           <ul id="local-data-facts" class="facts"></ul>
           <div class="actions" style="margin-top:18px">
-            <button class="secondary" type="button" id="export-all">Gesamtsicherung exportieren</button>
-            <label class="file-button">Gesamtsicherung importieren<input id="import-all" type="file" accept="application/json" hidden></label>
+            <button class="secondary" type="button" id="export-all">Vollständige CSV herunterladen</button>
+            <label class="file-button">Vollständige CSV wiederherstellen<input id="import-complete-csv" type="file" accept=".csv,text/csv" hidden></label>
             <button class="danger" type="button" id="clear-clinical">Nur lokale CSV-Daten löschen</button>
           </div>
+          <div id="complete-csv-progress" class="progress" role="status" aria-live="polite"></div>
         </aside>
         <article class="card full">
           <h2>Speichermodell</h2>
-          <p>Die öffentliche Seite enthält keinen Patientendatensatz. Jeder Browser besitzt seinen eigenen lokalen Datenbestand. Alle Kennzahlen, Zeitmuster, Mahlzeitenvergleiche, Wirkungsschätzungen und Empfehlungen werden ausschließlich aus diesem Bestand erzeugt.</p>
+          <p>Die öffentliche Seite enthält keinen Patientendatensatz. Jeder Browser besitzt seinen eigenen lokalen Datenbestand. Alle Kennzahlen, Zeitmuster, Mahlzeitenvergleiche, Wirkungsschätzungen und Empfehlungen werden ausschließlich aus diesem Bestand erzeugt. Die vollständige GlucoseCoach-CSV ist der einzige Sicherungs- und Wiederherstellungsweg der App.</p>
         </article>
       </div>
     </section>
@@ -237,6 +241,7 @@
 
     <footer>Retrospektive Musteranalyse aus dem persönlichen lokalen Datenbestand. Keine Diagnose, keine automatische Insulindosierung und kein Ersatz für Pumpen-/CGM-Alarme oder den individuell vereinbarten Behandlungsplan.</footer>
   </main>
+  <script src="site-version.js"></script>
   <script src="app-v3.js"></script>
 </body>
 </html>
