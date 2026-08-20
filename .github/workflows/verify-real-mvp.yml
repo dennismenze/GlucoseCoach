@@ -37,6 +37,7 @@ jobs:
             docs/app-importers-context.js \
             docs/app-ui-contract.js \
             docs/app-meal-window.js \
+            docs/app-meal-overlap-fallback.js \
             docs/app-insulin-action.js \
             docs/app-export-core.js \
             docs/app-zip-core.js \
@@ -44,6 +45,7 @@ jobs:
             docs/app-export-ui.js \
             docs/app-insulin-summary-core.js \
             docs/app-insulin-summary-ui.js \
+            docs/app-all-bolus-phases.js \
             docs/app-compact-lists.js \
             docs/version.js \
             docs/app-version.js; do
@@ -61,6 +63,7 @@ jobs:
               "docs/app-importers-context.js",
               "docs/app-ui-contract.js",
               "docs/app-meal-window.js",
+              "docs/app-meal-overlap-fallback.js",
               "docs/app-insulin-action.js",
               "docs/app-export-core.js",
               "docs/app-zip-core.js",
@@ -68,6 +71,7 @@ jobs:
               "docs/app-export-ui.js",
               "docs/app-insulin-summary-core.js",
               "docs/app-insulin-summary-ui.js",
+              "docs/app-all-bolus-phases.js",
               "docs/app-compact-lists.js",
               "docs/version.js",
               "docs/app-version.js",
@@ -88,11 +92,13 @@ jobs:
               "app-importers-context.js",
               "app-ui-contract.js",
               "app-meal-window.js",
+              "app-meal-overlap-fallback.js",
               "app-insulin-action.js",
               "app-export-core.js",
               "app-zip-core.js",
               "app-zip64-compat.js",
               "app-export-ui.js",
+              "app-all-bolus-phases.js",
               "app-compact-lists.js",
               "version.js",
               "app-version.js",
@@ -129,10 +135,16 @@ jobs:
               "mögliche Korrekturen",
               "2-h-Wert bleibt nur ein Referenzwert",
               "pharmakologischen Insulin-Wirkbeginns",
+              "maximum-before-next-meal-bolus",
+              "Ersatz für 2-h-Wert",
               "analyzeInsulinAction",
               "ACTION_WINDOW_MINUTES = 300",
               "MIN_CGM_COVERAGE = 0.80",
               "END_REMAINING_FRACTION = 0.10",
+              "Beobachteter Wirkeintritt über alle Boli",
+              "GC_ALL_BOLUS_PHASE_WINDOW_MINUTES",
+              "CLEAR_RISE_MGDL_PER_15_MIN = 6",
+              "TURN_DROP_MGDL = 8",
               "keine Empfehlung zur Änderung von Pumpenparametern",
           ]
           forbidden = [
@@ -154,7 +166,7 @@ jobs:
           ]
           if redundant:
               raise SystemExit(f"Redundant export contract returned: {redundant}")
-          print("Personal-local meal, ZIP/CSV, compact-list and version site verified")
+          print("Personal-local meal, all-bolus, ZIP/CSV, compact-list and version site verified")
           PY
 
       - name: Syntax-check browser and E2E modules
@@ -163,7 +175,9 @@ jobs:
           set -euo pipefail
           node --check docs/app-v3.js
           node --check docs/app-meal-window.js
+          node --check docs/app-meal-overlap-fallback.js
           node --check docs/app-insulin-action.js
+          node --check docs/app-all-bolus-phases.js
           node --check docs/app-export-core.js
           node --check docs/app-zip-core.js
           node --check docs/app-zip64-compat.js
@@ -175,6 +189,8 @@ jobs:
           node --check tests/sites_logic_test.cjs
           node --check tests/postprandial_peak_test.cjs
           node --check tests/insulin_action_test.cjs
+          node --check tests/all_bolus_phases_test.cjs
+          node --check tests/meal_overlap_fallback_test.cjs
           node --check tests/zip_exchange_test.cjs
           node --check tests/zip64_fixture.cjs
           node --check tests/zip64_compat_test.cjs
@@ -188,6 +204,7 @@ jobs:
           node --check e2e/insulin-summary-ui.e2e.spec.cjs
           node --check e2e/compact-version.e2e.spec.cjs
           node --check e2e/zip64-import.e2e.spec.cjs
+          node --check e2e/all-bolus-phases-meal-overlap.e2e.spec.cjs
           node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
           python -m py_compile scripts/stamp_site_version.py
@@ -206,3 +223,5 @@ jobs:
           python -m unittest discover -s tests -p 'test_*.py'
           node tests/zip_exchange_test.cjs
           node tests/zip64_compat_test.cjs
+          node tests/all_bolus_phases_test.cjs
+          node tests/meal_overlap_fallback_test.cjs
