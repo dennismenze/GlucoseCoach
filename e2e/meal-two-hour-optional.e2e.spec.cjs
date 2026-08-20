@@ -46,8 +46,9 @@ function bolus(start) {
 }
 
 test('a missing two-hour reference does not invalidate a completed meal peak', () => {
-  const first = minute('2026-08-03T08:00:00+02:00');
-  const second = minute('2026-08-04T08:00:00+02:00');
+  // date-time-local values are parsed in the Node process timezone; keep the synthetic axis aligned.
+  const first = minute('2026-08-03T08:00:00Z');
+  const second = minute('2026-08-04T08:00:00Z');
   const missingReference = app.analyzeMealAdaptivePeak(
     entry('2026-08-03T08:00', 'missing-two-hour'),
     curve(first, false),
