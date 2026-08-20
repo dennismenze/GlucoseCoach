@@ -24,7 +24,7 @@ class GlookoModeContractTests(unittest.TestCase):
             "isDuplicateMeal",
             "Glooko-Webexport",
             "Glooko · nur lesbar",
-            "Beide Quellen fließen gemeinsam in die Auswertung ein",
+            "gemeinsam in die Auswertung ein.</p>",
             "form.hidden = false",
             "foodEvents",
             "cgmCarbs",
