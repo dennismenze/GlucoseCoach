@@ -113,8 +113,6 @@
   function extraKind(filename, headers) {
     const file = String(filename || '').toLowerCase();
 
-    // These six are handled by the base importer. Never let a broad context
-    // heuristic (for example the substring "wert") intercept them.
     if (/^(?:cgm_data_|bolus_data_|insulin_data_|basal_data_|bg_data_|alarms_data_)/.test(file)) {
       return null;
     }
@@ -360,26 +358,6 @@
         } catch (error) {
           if (progress) progress.textContent = `Import fehlgeschlagen: ${error.message}`;
         }
-      };
-    }
-
-    const backupInput = document.querySelector('#import-all');
-    if (backupInput) {
-      backupInput.onchange = async (event) => {
-        try {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          const payload = JSON.parse(await file.text());
-          if (!Array.isArray(payload.diary) || !payload.clinical) throw new Error('Ungültige Gesamtsicherung');
-          gcState.diary = payload.diary;
-          gcState.clinical = normalizeClinicalExtended(payload.clinical);
-          gcState.lastImport = null;
-          gcSave();
-          gcRender();
-        } catch (error) {
-          alert(error.message);
-        }
-        event.target.value = '';
       };
     }
 
