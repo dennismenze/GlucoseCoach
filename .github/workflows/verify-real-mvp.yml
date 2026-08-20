@@ -40,6 +40,7 @@ jobs:
             docs/app-insulin-action.js \
             docs/app-export-core.js \
             docs/app-zip-core.js \
+            docs/app-zip64-compat.js \
             docs/app-export-ui.js \
             docs/app-insulin-summary-core.js \
             docs/app-insulin-summary-ui.js \
@@ -63,6 +64,7 @@ jobs:
               "docs/app-insulin-action.js",
               "docs/app-export-core.js",
               "docs/app-zip-core.js",
+              "docs/app-zip64-compat.js",
               "docs/app-export-ui.js",
               "docs/app-insulin-summary-core.js",
               "docs/app-insulin-summary-ui.js",
@@ -89,12 +91,14 @@ jobs:
               "app-insulin-action.js",
               "app-export-core.js",
               "app-zip-core.js",
+              "app-zip64-compat.js",
               "app-export-ui.js",
               "app-compact-lists.js",
               "version.js",
               "app-version.js",
               "glucosecoach-csv-v1",
               "glucosecoach-omnipod-zip-v1",
+              "ZIP64-Größenangaben",
               "CSV-ZIP herunterladen",
               "ZIP hier ablegen",
               "glucosecoach_data_1.csv",
@@ -162,6 +166,7 @@ jobs:
           node --check docs/app-insulin-action.js
           node --check docs/app-export-core.js
           node --check docs/app-zip-core.js
+          node --check docs/app-zip64-compat.js
           node --check docs/app-export-ui.js
           node --check docs/app-insulin-summary-core.js
           node --check docs/app-insulin-summary-ui.js
@@ -171,6 +176,8 @@ jobs:
           node --check tests/postprandial_peak_test.cjs
           node --check tests/insulin_action_test.cjs
           node --check tests/zip_exchange_test.cjs
+          node --check tests/zip64_fixture.cjs
+          node --check tests/zip64_compat_test.cjs
           node --check e2e/oracle.cjs
           node --check e2e/oracle-two-hour-patch.cjs
           node --check e2e/insulin-action-oracle.cjs
@@ -180,6 +187,7 @@ jobs:
           node --check e2e/complete-export.e2e.spec.cjs
           node --check e2e/insulin-summary-ui.e2e.spec.cjs
           node --check e2e/compact-version.e2e.spec.cjs
+          node --check e2e/zip64-import.e2e.spec.cjs
           node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
           python -m py_compile scripts/stamp_site_version.py
@@ -197,3 +205,4 @@ jobs:
           pip install -r requirements.txt
           python -m unittest discover -s tests -p 'test_*.py'
           node tests/zip_exchange_test.cjs
+          node tests/zip64_compat_test.cjs
