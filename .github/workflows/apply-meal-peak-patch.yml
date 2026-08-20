@@ -1,9 +1,6 @@
 name: Apply meal peak correction-bolus patch
 
 on:
-  push:
-    branches:
-      - 'fix/meal-peak-correction-bolus'
   pull_request:
     branches:
       - main
@@ -17,12 +14,13 @@ concurrency:
 
 jobs:
   apply:
-    if: github.ref_name == 'fix/meal-peak-correction-bolus' || github.head_ref == 'fix/meal-peak-correction-bolus'
+    if: github.head_ref == 'fix/meal-peak-correction-bolus'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: fix/meal-peak-correction-bolus
           fetch-depth: 0
 
       - name: Verify and unpack generated patch
@@ -30,11 +28,6 @@ jobs:
         run: |
           set -euo pipefail
           test -f tmp/gc-patch.part05
-          # Repair the one transport-only split typo, then ignore harmless whitespace.
-          sed -i 's/BNleRf ndziWT6/BNleRf NajeriyaWT6/' tmp/gc-patch.part02
-          sed -i 's/BNleRf NajeriyaWT6/BNleRf_jsiiWT6/' tmp/gc-patch.part02
-          sed -i 's/BNleRf_jsiiWT6/BNleRf ndziWT6/' tmp/gc-patch.part02
-          sed -i 's/BNleRf ndziWT6/BNleRf ndziWT6/' tmp/gc-patch.part02
           python - <<'PY'
           from pathlib import Path
           path = Path('tmp/gc-patch.part02')
@@ -56,7 +49,10 @@ jobs:
           FILES
           )
           tar -xzf /tmp/gc-patch.tar.gz
-          rm -rf tmp .github/workflows/apply-meal-peak-patch.yml
+          # Workflow files are updated separately through the GitHub connector,
+          # because GITHUB_TOKEN cannot modify workflows in this repository.
+          git checkout -- .github/workflows/verify-real-mvp.yml
+          rm -rf tmp
 
       - name: Run focused verification before committing
         shell: bash
@@ -71,7 +67,7 @@ jobs:
           node tests/postprandial_peak_test.cjs
           python scripts/validate_project.py
 
-      - name: Commit final branch contents
+      - name: Commit final product and test contents
         shell: bash
         run: |
           set -euo pipefail
