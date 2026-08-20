@@ -83,6 +83,7 @@ async function clearLocalData(page) {
   });
   await page.reload();
   await expect(page.locator('#export-all')).toHaveText('CSV-ZIP herunterladen');
+  await clickTab(page, 'import-data');
 }
 
 async function storedState(page) {
