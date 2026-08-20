@@ -1,0 +1,66 @@
+name: Apply carbohydrate-based bolus classification
+
+on:
+  push:
+    branches:
+      - fix/bolus-without-carbs-is-correction
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/bolus-without-carbs-is-correction
+          fetch-depth: 0
+
+      - name: Apply classification and regression-test patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' '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' | base64 --decode > /tmp/bolus-classification.py.gz
+          echo '839f09b79989b82bd93fca8c053e680cc99a9ad18541e07b4b1a518a0b1c6e41  /tmp/bolus-classification.py.gz' | sha256sum --check --strict
+          gzip --decompress --stdout /tmp/bolus-classification.py.gz > /tmp/bolus-classification.py
+          python /tmp/bolus-classification.py
+
+      - name: Run focused verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check docs/app-insulin-action.js
+          node --check docs/app-meal-window.js
+          node --check e2e/insulin-action-oracle.cjs
+          node --check e2e/insulin-action.e2e.spec.cjs
+          node --check e2e/oracle-two-hour-patch.cjs
+          node --check e2e/postprandial-peak.e2e.spec.cjs
+          node --check tests/insulin_action_test.cjs
+          node --check tests/postprandial_peak_test.cjs
+          python -m py_compile tests/test_sites_v2.py
+          node tests/insulin_action_test.cjs
+          node tests/postprandial_peak_test.cjs
+          python scripts/validate_project.py
+
+      - name: Commit product and test changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            AGENTS.md \
+            docs/app-insulin-action.js \
+            docs/app-meal-window.js \
+            e2e/insulin-action-oracle.cjs \
+            e2e/insulin-action.e2e.spec.cjs \
+            e2e/oracle-two-hour-patch.cjs \
+            e2e/postprandial-peak.e2e.spec.cjs \
+            tests/insulin_action_test.cjs \
+            tests/postprandial_peak_test.cjs \
+            tests/test_sites_v2.py
+          git commit -m 'fix: classify boluses without carbs as corrections'
+          git push origin HEAD:fix/bolus-without-carbs-is-correction
