@@ -21,15 +21,6 @@
     return;
   }
 
-  const cleanupStyle = document.createElement('style');
-  cleanupStyle.id = 'legacy-json-control-hider';
-  cleanupStyle.textContent = `
-    #export-diary,
-    label:has(#import-diary),
-    label:has(#import-all) { display: none !important; }
-  `;
-  document.head.appendChild(cleanupStyle);
-
   function loadScript(src, onload) {
     const script = document.createElement('script');
     script.src = src;
