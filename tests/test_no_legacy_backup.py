@@ -46,11 +46,14 @@ class NoLegacyBackupTest(unittest.TestCase):
 
     def test_static_page_exposes_one_csv_exchange_path_and_one_version_source(self) -> None:
         index = (DOCS / "index.html").read_text(encoding="utf-8")
+        loader = (DOCS / "app-v3.js").read_text(encoding="utf-8")
         self.assertEqual(index.count('id="export-all"'), 1)
         self.assertEqual(index.count('id="import-complete-csv"'), 1)
         self.assertEqual(index.count('src="version.js"'), 1)
         self.assertEqual(index.count('src="app-v3.js"'), 1)
         self.assertEqual(index.count('id="app-version"'), 1)
+        self.assertNotIn("version.js", loader)
+        self.assertNotIn("JSON", index)
         self.assertIn("Vollständige CSV herunterladen", index)
         self.assertIn("Vollständige CSV importieren", index)
 
