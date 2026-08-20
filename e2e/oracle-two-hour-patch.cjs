@@ -48,25 +48,26 @@ function positiveBoluses(boluses, start, end) {
 }
 
 function selectMealBolus(entry, boluses, minute, contextEnd) {
-    const carbohydrateCandidates = positiveBoluses(
-      boluses,
-      minute - BOLUS_LOOKBACK_MINUTES,
-      Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
-    ).filter((row) => Number(row[1]) > 0);
-    if (!carbohydrateCandidates.length) return null;
+  const carbohydrateCandidates = positiveBoluses(
+    boluses,
+    minute - BOLUS_LOOKBACK_MINUTES,
+    Math.min(contextEnd, minute + MEAL_BOLUS_ASSOCIATION_MINUTES),
+  ).filter((row) => Number(row[1]) > 0);
+  if (!carbohydrateCandidates.length) return null;
 
-    const diaryCarbs = numberOrNull(entry?.carbs);
-    return [...carbohydrateCandidates].sort((a, b) => {
-      if (diaryCarbs !== null) {
-        const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
-          Math.abs(Number(b[1]) - diaryCarbs);
-        if (carbohydrateDistance !== 0) return carbohydrateDistance;
-      }
-      const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
-      if (timeDistance !== 0) return timeDistance;
-      return a[0] - b[0];
-    })[0] || null;
-  }
+  const diaryCarbs = numberOrNull(entry?.carbs);
+  return [...carbohydrateCandidates].sort((a, b) => {
+    if (diaryCarbs !== null) {
+      const carbohydrateDistance = Math.abs(Number(a[1]) - diaryCarbs) -
+        Math.abs(Number(b[1]) - diaryCarbs);
+      if (carbohydrateDistance !== 0) return carbohydrateDistance;
+    }
+    const timeDistance = Math.abs(a[0] - minute) - Math.abs(b[0] - minute);
+    if (timeDistance !== 0) return timeDistance;
+    return a[0] - b[0];
+  })[0] || null;
+}
+
 function confirmation(rows, startIndex) {
   const candidate = rows[startIndex];
   const future = [];
@@ -185,18 +186,21 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
   const peakRow = peakRows.length
     ? peakRows.reduce((best, row) => row[1] > best[1] ? row : best, peakRows[0])
     : null;
+  const peakComplete = Boolean(bolus && turn && peakRow);
 
   let status = 'partial-analysis';
   if (!bolus) status = allBoluses.length ? 'missing-meal-bolus' : 'missing-bolus';
   else if (!turn && truncatedByNextMeal) status = 'overlapping-meal';
   else if (!turn) status = 'no-stable-decline';
-  else if (!peakRow || !two) status = 'partial-analysis';
+  else if (!peakComplete) status = 'partial-analysis';
+  else if (!two) status = 'complete-missing-two-hour';
   else status = 'complete';
 
   return {
     entry,
     minute,
-    complete: status === 'complete',
+    complete: peakComplete,
+    peakComplete,
     status,
     baseline,
     minutesToRise: rise ? rise[0] - minute : null,
@@ -206,6 +210,7 @@ function analyze(entry, cgm, boluses, nextMealMinute) {
     peakDelta: peakRow ? peakRow[1] - baseline : null,
     twoHour: two?.[1] ?? null,
     twoHourDelta: two ? two[1] - baseline : null,
+    twoHourAvailable: Boolean(two),
     bolus,
     mealBolus: bolus,
     bolusOffset: bolus ? bolus[0] - minute : null,
