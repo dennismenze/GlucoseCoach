@@ -45,19 +45,34 @@ async function assertEveryDisplayedInsulinNumber(page, expected) {
   await expect(aggregateValues).toHaveCount(expected.aggregateFacts.length);
   await expect(aggregateValues).toHaveText(expected.aggregateFacts);
 
-  const profileRows = page.locator('#insulin-profile tr');
-  await expect(profileRows).toHaveCount(expected.profile.length);
+  const chart = page.locator('#insulin-profile-chart');
+  await expect(chart).toBeVisible();
+  await expect(chart.locator('svg')).toHaveAttribute('role', 'img');
+  const chartBox = await chart.boundingBox();
+  expect(chartBox).not.toBeNull();
+  expect(chartBox.height).toBeLessThanOrEqual(220);
+
+  const profilePoints = chart.locator('[data-profile-point]');
+  await expect(profilePoints).toHaveCount(expected.profile.length);
   for (let index = 0; index < expected.profile.length; index += 1) {
-    await expect(profileRows.nth(index).locator('td')).toHaveText(expected.profile[index]);
+    const [offset, events, median, middleFifty] = expected.profile[index];
+    const point = profilePoints.nth(index);
+    await expect(point).toHaveAttribute('data-offset-label', offset);
+    await expect(point).toHaveAttribute('data-events', events);
+    await expect(point).toHaveAttribute('data-median', median);
+    await expect(point).toHaveAttribute('data-middle-fifty', middleFifty);
+    await expect(point.locator('title')).toContainText(`n=${events}`);
   }
   await expect(page.locator('#insulin-profile-empty')).toBeHidden();
+  const profileTableWrap = page.locator('#insulin-profile')
+    .locator('xpath=ancestor::div[contains(@class,"table-wrap")][1]');
+  await expect(profileTableWrap).toBeHidden();
 
-  const groupRows = page.locator('#insulin-groups tr');
-  await expect(groupRows).toHaveCount(expected.groups.length);
-  for (let index = 0; index < expected.groups.length; index += 1) {
-    await expect(groupRows.nth(index).locator('td')).toHaveText(expected.groups[index]);
-  }
-  await expect(page.locator('#insulin-groups-empty')).toBeHidden();
+  await expect(page.locator('#insulin-groups')).toHaveCount(0);
+  await expect(page.locator('#insulin-action h2', { hasText: 'Stratifizierte Schätzungen' }))
+    .toHaveCount(0);
+  await expect(page.locator('#insulin-action h2', { hasText: 'Qualitätsregeln' }))
+    .toHaveCount(0);
 
   const eventCards = page.locator('#insulin-events .insulin-event');
   await expect(eventCards).toHaveCount(expected.events.length);
@@ -76,19 +91,39 @@ async function assertEveryDisplayedInsulinNumber(page, expected) {
     await expect(card).toContainText('Keine der derzeit geprüften Störvariablen erkannt.');
   }
 
-  const expectedCalculatedCells =
+  const expectedCalculatedValues =
     expected.summary.length +
     expected.aggregateFacts.length +
     expected.profile.length * 4 +
-    expected.groups.length * 5 +
     expected.events.length * 12;
-  const actualCalculatedCells =
+  const actualCalculatedValues =
     await summaryValues.count() +
     await aggregateValues.count() +
-    await page.locator('#insulin-profile td').count() +
-    await page.locator('#insulin-groups td').count() +
+    await profilePoints.count() * 4 +
     await page.locator('#insulin-events .insulin-event-grid strong').count();
-  expect(actualCalculatedCells, 'every calculated insulin-action cell is covered').toBe(expectedCalculatedCells);
+  expect(actualCalculatedValues, 'every displayed insulin-action value is covered')
+    .toBe(expectedCalculatedValues);
+}
+
+async function assertExplanationsAreCollapsible(page) {
+  const disclosures = [
+    '#insulin-primary-explanation',
+    '#all-bolus-explanation',
+    '#insulin-means-explanation',
+    '#insulin-profile-explanation',
+    '#insulin-events-explanation',
+  ];
+  for (const selector of disclosures) {
+    const disclosure = page.locator(selector);
+    await expect(disclosure).toBeAttached();
+    expect(await disclosure.evaluate((element) => element.open)).toBe(false);
+  }
+
+  await expect(page.locator('#insulin-method-note')).not.toBeVisible();
+  await expect(page.locator('#insulin-action .notice.warn')).not.toBeVisible();
+  await page.locator('#insulin-primary-explanation > summary').click();
+  await expect(page.locator('#insulin-method-note')).toBeVisible();
+  await expect(page.locator('#insulin-action .notice.warn')).toBeVisible();
 }
 
 test('personal insulin-action tab verifies every displayed calculated value', async ({ page }) => {
@@ -122,6 +157,7 @@ test('personal insulin-action tab verifies every displayed calculated value', as
   );
 
   await assertEveryDisplayedInsulinNumber(page, expected);
+  await assertExplanationsAreCollapsible(page);
 
   expect(consoleErrors, 'browser console errors').toEqual([]);
   expect(pageErrors, 'uncaught browser errors').toEqual([]);
