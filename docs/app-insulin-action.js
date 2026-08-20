@@ -240,6 +240,10 @@
     return number(row?.[1]) > 0;
   }
 
+  function isCorrectionBolus(event) {
+    return !(number(event?.carbs) > 0);
+  }
+
   function eventWithin(rows, start, end, predicate = () => true) {
     return (rows || []).some(
       (row) => Array.isArray(row) && Number(row[0]) >= start && Number(row[0]) <= end && predicate(row),
@@ -464,8 +468,8 @@
       null,
     );
     const stable = nadir ? stablePhase(post, nadir[0]) : null;
-    const correctionCandidate = mealReasons.length === 0;
-    const eligibleCorrection = correctionCandidate && exclusionReasons.length === 0;
+    const correctionBolus = isCorrectionBolus(event);
+    const eligibleCorrection = correctionBolus && exclusionReasons.length === 0;
     const detectable = eligibleCorrection && onset && peakEffect?.effect >= ONSET_CONFIRMED_MGDL;
 
     let score = 100;
@@ -476,10 +480,10 @@
 
     return {
       ...event,
-      classification: mealReasons.length ? 'Mahlzeiten-/Kontextbolus' : 'Korrekturkandidat',
+      classification: correctionBolus ? 'Korrekturbolus' : 'Mahlzeitenbolus',
       mealReasons,
       exclusionReasons: [...new Set(exclusionReasons)],
-      correctionCandidate,
+      correctionBolus,
       eligibleCorrection,
       detectable: Boolean(detectable),
       qualityScore: score,
@@ -572,11 +576,11 @@
 
     const aggregate = {
       totalBoluses: analyses.length,
-      correctionCandidates: analyses.filter((event) => event.correctionCandidate).length,
+      correctionBoluses: analyses.filter((event) => event.correctionBolus).length,
       eligibleCorrections: eligible.length,
       analyzedCorrections: analyzable.length,
       excludedCorrections: analyses.filter(
-        (event) => event.correctionCandidate && !event.eligibleCorrection,
+        (event) => event.correctionBolus && !event.eligibleCorrection,
       ).length,
       censoredActionEnds: analyzable.filter((event) => event.actionEndCensored).length,
       sufficient: analyzable.length >= MIN_AGGREGATE_EVENTS,
@@ -646,7 +650,7 @@
     if (!target) return;
     const cards = [
       ['Bolusereignisse', aggregate.totalBoluses],
-      ['Korrekturkandidaten', aggregate.correctionCandidates],
+      ['Korrekturboli ohne KH-Eingabe', aggregate.correctionBoluses],
       ['streng isoliert', aggregate.eligibleCorrections],
       ['mit erkennbarem Effekt', aggregate.analyzedCorrections],
       ['geschätzter Wirkbeginn', aggregate.sufficient ? formatDistribution(aggregate.onset) : 'zu wenige Ereignisse'],
@@ -714,8 +718,8 @@
   function eventStatus(event) {
     if (event.detectable) return ['ok', 'auswertbar'];
     if (event.eligibleCorrection) return ['partial', 'kein stabil erkennbarer Effekt'];
-    if (event.correctionCandidate) return ['partial', 'ausgeschlossen'];
-    return ['wait', 'Mahlzeiten-/Kontextbolus'];
+    if (event.correctionBolus) return ['partial', 'ausgeschlossen'];
+    return ['wait', 'Mahlzeitenbolus'];
   }
 
   function renderEvents(events) {
@@ -769,6 +773,8 @@
     const note = document.querySelector('#insulin-method-note');
     if (note) {
       note.textContent =
+        'Boluseinträge ohne positive Kohlenhydratangabe werden immer als Korrekturbolus klassifiziert. ' +
+        'Ein Mahlzeitenhinweis im Umfeld kann ein solches Ereignis aus der isolierten Wirkungsanalyse ausschließen, ändert aber nicht seine Klassifikation. ' +
         'Die Pumpeneinstellung von 2 Stunden wird für diese Schätzung nicht verwendet. ' +
         'Die Analyse betrachtet bis zu 5 Stunden nach dem tatsächlichen Boluszeitpunkt. ' +
         '„Stabile Glukose“ und „Insulin wirkt nicht mehr“ sind nicht gleichbedeutend. ' +

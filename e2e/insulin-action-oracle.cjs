@@ -170,7 +170,7 @@ function buildFixture() {
   ];
   const cgm = times.flatMap((when, index) => correctionCurve(when, index * 2));
   const boluses = times.map((when, index) => [
-    minute(when), 0, 1 + index * 0.2, 220 + index * 2, 'Korrektur',
+    minute(when), null, 1 + index * 0.2, 220 + index * 2, 'Bolus',
   ]);
   return { times, cgm, boluses };
 }
@@ -269,7 +269,7 @@ function analyzeFixture(fixture) {
     events,
     aggregate: {
       totalBoluses: 4,
-      correctionCandidates: 4,
+      correctionBoluses: 4,
       eligibleCorrections: 4,
       analyzedCorrections: 4,
       censoredActionEnds: 0,
@@ -315,6 +315,14 @@ function expectedDom(fixture) {
   const result = analyzeFixture(fixture);
   const a = result.aggregate;
   return {
+    summaryLabels: [
+      'Bolusereignisse',
+      'Korrekturboli ohne KH-Eingabe',
+      'streng isoliert',
+      'mit erkennbarem Effekt',
+      'geschätzter Wirkbeginn',
+      'Vertrauensstufe',
+    ],
     summary: ['4', '4', '4', '4', dist(a.onset), 'niedrig'],
     aggregateFacts: [
       dist(a.onset),
@@ -340,7 +348,7 @@ function expectedDom(fixture) {
       dist(item.end),
     ]),
     events: [...result.events].sort((x, y) => y.minute - x.minute).map((event) => ({
-      heading: `${fmt(event.units, 2)} E · Korrekturkandidat`,
+      heading: `${fmt(event.units, 2)} E · Korrekturbolus`,
       dateTime: dateTime(event.minute),
       status: 'auswertbar',
       labels: [
@@ -399,7 +407,7 @@ function bolusCsv(fixture) {
     'Zeitstempel,Kohlenhydrataufnahme (g),Abgegebenes Insulin (E),Blutzuckereingabe (mg/dl),Insulin-Typ',
     ...fixture.boluses.map((row) => [
       exportTimestamp(row[0]),
-      '0',
+      '',
       `"${String(row[2]).replace('.', ',')}"`,
       row[3],
       row[4],

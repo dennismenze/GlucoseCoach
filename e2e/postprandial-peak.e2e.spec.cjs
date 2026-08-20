@@ -76,7 +76,9 @@ function bolusCsv(rows) {
     'Zeitstempel,Kohlenhydrataufnahme (g),Abgegebenes Insulin (E),Blutzuckereingabe (mg/dl),Insulin-Typ',
     ...rows.map((row) => [
       exportTimestamp(row[0]),
-      `"${String(row[1]).replace('.', ',')}"`,
+      row[1] === null || row[1] === undefined
+        ? ''
+        : `"${String(row[1]).replace('.', ',')}"`,
       `"${String(row[2]).replace('.', ',')}"`,
       row[3],
       row[4],
@@ -141,9 +143,10 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   const intro = page.locator('#meal-analysis article.card.full p.muted');
   await expect(intro).toContainText('nicht mehr auf zwei Stunden begrenzt');
   await expect(intro).toContainText('Bis zu fünf Stunden');
-  await expect(intro).toContainText('mahlzeitennaher positiver Bolus');
+  await expect(intro).toContainText('mahlzeitennaher positiver');
+  await expect(intro).toContainText('ohne Kohlenhydratangabe gilt immer als Korrekturbolus');
   await expect(intro).toContainText('starten den Peak nicht neu');
-  await expect(intro).toContainText('mögliche Korrekturen');
+  await expect(intro).toContainText('Korrekturboli behandelt');
 
   for (const entry of entries) await addDiaryEntry(page, entry);
 
@@ -207,6 +210,47 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   const qualityRow = page.locator('#quality-body tr').filter({ hasText: 'Mahlzeiten-Peakfenster' });
   await expect(qualityRow.locator('td').nth(1)).toHaveText('Mahlzeitenbolus → Rückgang · max. 5 h');
   await expect(qualityRow.locator('td').nth(2)).toContainText('starten den Peak nicht neu');
+
+  expect(errors.consoleErrors, 'browser console errors').toEqual([]);
+  expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
+});
+
+test('blank-carbohydrate bolus cannot anchor a meal peak', async ({ page }) => {
+  const errors = collectBrowserErrors(page);
+  const entry = {
+    when: '2026-08-19T06:00',
+    food: 'Testessen ohne Mahlzeitenbolus',
+    carbs: '40',
+  };
+  const start = localMinute(entry.when);
+
+  await page.goto('/');
+  await addDiaryEntry(page, entry);
+  await clickTab(page, 'import-data');
+  await page.locator('#csv-files').setInputFiles([
+    {
+      name: 'cgm_data_blank_carbs.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(cgmCsv(lateFatCurve(entry.when)), 'utf8'),
+    },
+    {
+      name: 'bolus_data_blank_carbs.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(bolusCsv([[start + 20, null, 0.6, 150, 'Bolus']]), 'utf8'),
+    },
+  ]);
+  await page.locator('#import-csv').click();
+  await expect(page.locator('#import-progress')).toContainText('Fertig:');
+  await clickTab(page, 'meal-analysis');
+
+  const item = page.locator('#meal-events .analysis-item').first();
+  await expect(item.locator('.status')).toHaveText('teilweise');
+  await expect((await gridCell(item, 'Peak nach Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('nicht bestimmbar');
+  await expect((await gridCell(item, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
+    .toHaveText('kein mahlzeitennaher positiver Bolus mit positiver KH-Angabe (±60 min) gefunden');
+  await expect(page.locator('#meal-analysis article.card.full p.muted'))
+    .toContainText('ohne Kohlenhydratangabe gilt immer als Korrekturbolus');
 
   expect(errors.consoleErrors, 'browser console errors').toEqual([]);
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);

@@ -63,6 +63,8 @@ Für `Insulinwirkung` gilt zusätzlich:
 - das Oracle darf nicht die Produktfunktion `analyzeInsulinAction` importieren;
 - jede dargestellte berechnete Zahl in Zusammenfassung, Aggregat, Wirkungskurve, Gruppen und Einzelereignissen muss geprüft werden;
 - Fixtures müssen sowohl streng isolierte Korrekturen als auch auszuschließende Mahlzeiten-, Sport- oder Überlappungsereignisse abdecken;
+- jeder positive Bolus ohne positive Kohlenhydratangabe ist unabhängig von Typbezeichnung und Mahlzeitenkontext als Korrekturbolus zu klassifizieren;
+- Mahlzeitenkontext darf einen solchen Korrekturbolus aus der isolierten Wirkungsanalyse ausschließen, aber nicht in einen Mahlzeitenbolus umklassifizieren;
 - die Zwei-Stunden-Pumpeneinstellung darf nicht als tatsächliches Ende der Insulinwirkung behandelt werden;
 - Mahlzeitenboli dürfen nicht in die aggregierte persönliche Wirkzeit eingehen;
 - zensierte Ereignisse und Unsicherheitsangaben dürfen nicht stillschweigend entfernt werden.
@@ -73,7 +75,7 @@ Für den Mahlzeiten-Peak müssen fokussierte Fixtures mindestens abdecken:
 - einen späteren Korrekturbolus während der noch steigenden Kurve;
 - einen weiteren Bolus nach dem eigentlichen Peak bzw. Wendepunkt;
 - den Nachweis, dass beide späteren Boli den Mahlzeitenbolus und den Peak-Start nicht ersetzen;
-- einen explizit als Korrektur gekennzeichneten Bolus ohne Mahlzeitenbolus, der keine vollständige Mahlzeitenanalyse erzeugen darf;
+- einen Bolus ohne positive Kohlenhydratangabe und mit beliebigem Typfeld, der keine vollständige Mahlzeitenanalyse erzeugen darf;
 - einen Bolus außerhalb des Zuordnungsfensters, der nicht rückwirkend als Mahlzeitenbolus verwendet werden darf.
 
 Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constraints wie `step`, `min` und `max` einzuhalten und CSV-Felder mit Trennzeichen korrekt zu quoten. Ein Test soll nicht wegen absichtlich oder versehentlich ungültiger Fixture-Daten fehlschlagen, außer genau diese Validierung wird getestet.
@@ -83,12 +85,12 @@ Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constr
 Der Mahlzeiten-Peak ist **nicht** auf 120 Minuten begrenzt. Fett- und proteinreiche Mahlzeiten können einen deutlich späteren Glukoseanstieg zeigen; deshalb gilt für die Implementierung:
 
 - der Mahlzeitenkontext reicht bis zu 300 Minuten nach dem protokollierten Essensbeginn, endet aber früher bei einer neuen protokollierten Mahlzeit;
-- als Mahlzeitenbolus kommt nur ein positiver Bolus im Bereich von 60 Minuten vor bis 60 Minuten nach dem protokollierten Essensbeginn infrage;
-- bei mehreren Kandidaten werden Einträge mit positiver Kohlenhydratangabe und ohne Korrekturkennzeichnung bevorzugt; vorhandene Tagebuch-Kohlenhydrate dürfen zur plausiblen Zuordnung verwendet werden;
-- ein ausschließlich als `Korrektur` bzw. `Correction` gekennzeichneter Bolus ohne Kohlenhydratangabe darf nicht als Mahlzeitenbolus verwendet werden;
+- als Mahlzeitenbolus kommt nur ein positiver Bolus mit positiver Kohlenhydratangabe im Bereich von 60 Minuten vor bis 60 Minuten nach dem protokollierten Essensbeginn infrage;
+- bei mehreren solchen Kandidaten dürfen vorhandene Tagebuch-Kohlenhydrate zur plausiblen Zuordnung verwendet werden;
+- jeder positive Bolus ohne positive Kohlenhydratangabe ist immer ein Korrekturbolus, unabhängig davon, ob sein Typfeld `Bolus`, `Korrektur`, `Correction` oder etwas anderes enthält; er darf nie als Mahlzeitenbolus verwendet werden;
 - ausgehend vom zugeordneten Mahlzeitenbolus wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
 - der maßgebliche Peak ist der höchste CGM-Wert zwischen diesem Mahlzeitenbolus und dem anschließend stabil bestätigten Rückgang;
-- weitere positive Boli ohne neue protokollierte Mahlzeit starten weder die Peak-Suche noch die Wendepunktsuche neu; Boli nach dem Mahlzeitenbolus und vor dem Wendepunkt werden als mögliche Korrekturen ausgewiesen;
+- weitere Boli ohne positive Kohlenhydratangabe starten weder die Peak-Suche noch die Wendepunktsuche neu; Boli nach dem Mahlzeitenbolus und vor dem Wendepunkt werden als Korrekturboli ausgewiesen;
 - solche späteren Boli bleiben Störvariablen und können den beobachteten CGM-Verlauf beeinflussen; das Ignorieren als Peak-Anker bedeutet nicht, dass ihre Wirkung rechnerisch entfernt wurde;
 - der 2-h-Wert bleibt als separater Referenzwert erhalten, ist aber nicht die Peak-Grenze;
 - ohne zugeordneten Mahlzeitenbolus oder ohne stabil bestätigten Rückgang darf kein endgültiger bolusbezogener Mahlzeiten-Peak behauptet werden;
