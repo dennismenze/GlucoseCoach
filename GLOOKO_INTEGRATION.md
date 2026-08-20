@@ -2,7 +2,7 @@
 
 ## Zielbild
 
-Glooko ist die primäre Erfassungs- und Geräteplattform. GlucoseCoach speichert keine Glooko-Zugangsdaten und bietet keine konkurrierende tägliche Essenseingabe an, sobald **Glooko-Lebensmitteleinträge** als Mahlzeitenquelle gewählt sind. GlucoseCoach übernimmt ausschließlich lokalen Import, retrospektive Verknüpfung, Deutung und Auswertung.
+Glooko ist eine zusätzliche Erfassungs- und Geräteplattform. Die bestehende tägliche Eingabe im GlucoseCoach-Tagebuch bleibt unabhängig davon vollständig nutzbar. Importierte Glooko-Mahlzeiten werden schreibgeschützt ergänzt; lokale und importierte Einträge fließen gemeinsam in die retrospektive Verknüpfung, Deutung und Auswertung ein.
 
 ## Heute unterstützt: nativer Webexport
 
@@ -21,9 +21,9 @@ Ein Glooko-Webexport wird als ZIP direkt im Browser entpackt. Unterordner werden
 - `medication_data_*.csv`
 - `notes_data_*.csv`
 
-`food_data_*` ist die bevorzugte Mahlzeitenquelle. Zeilen mit demselben Zeitstempel werden zu einer Mahlzeit aggregiert. Ein naher `cgm_carbs_data_*`-Eintrag ergänzt fehlende Kohlenhydrate, wird aber nicht doppelt addiert, wenn `food_data_*` bereits eine Kohlenhydratmenge enthält. Reine Kohlenhydratereignisse ohne Lebensmittelbezeichnung werden als **Glooko-Kohlenhydrate** analysiert.
+`food_data_*` ist die bevorzugte Quelle für importierte Glooko-Mahlzeiten. Zeilen mit demselben Zeitstempel werden zu einer Mahlzeit aggregiert. Ein naher `cgm_carbs_data_*`-Eintrag ergänzt fehlende Kohlenhydrate, wird aber nicht doppelt addiert, wenn `food_data_*` bereits eine Kohlenhydratmenge enthält. Reine Kohlenhydratereignisse ohne Lebensmittelbezeichnung werden als **Glooko-Kohlenhydrate** analysiert.
 
-Importierte Mahlzeiten sind schreibgeschützt. Korrekturen erfolgen in Glooko und werden mit dem nächsten Export übernommen. Wiederholte Importe sind dedupliziert.
+Importierte Mahlzeiten sind schreibgeschützt. Korrekturen erfolgen in Glooko und werden mit dem nächsten Export übernommen. Wiederholte Importe sind dedupliziert. Das lokale Formular wird nicht ausgeblendet. Zeitlich und inhaltlich passende Mahlzeiten aus beiden Quellen werden für die Analyse als derselbe Vorgang behandelt, damit ein parallel erfasster Eintrag nicht doppelt in Gruppenmittel, Peaks oder Empfehlungen eingeht.
 
 ## Direkte Synchronisation
 
