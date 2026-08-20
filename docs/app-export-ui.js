@@ -28,6 +28,7 @@
 
   function currentPayload() {
     return {
+      version: root.GLUCOSECOACH_VERSION || '',
       profile: readProfile(),
       ui: { windowDays: gcState.windowDays },
       diary: safeArray(gcState.diary),
@@ -51,7 +52,91 @@
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
+  function removeControl(id) {
+    const control = document.querySelector(`#${id}`);
+    if (!control) return;
+    const label = control.closest('label');
+    if (label) label.remove();
+    else control.remove();
+  }
+
+  function removeLegacyJsonControls() {
+    for (const id of ['export-all-json', 'export-diary', 'import-diary', 'import-all']) {
+      removeControl(id);
+    }
+    const paragraph = document.querySelector('#diary article.card.wide > p.muted');
+    if (paragraph) {
+      paragraph.textContent =
+        'Einträge werden lokal unter derselben Website-Adresse gespeichert. Andere Browser und Geräte sehen sie nicht. Für einen Gerätewechsel kann die vollständige CSV exportiert und wieder importiert werden.';
+    }
+  }
+
+  function restoreCompleteCsv(file, api) {
+    return file.text().then((source) => {
+      const payload = api.parseCompleteCsv(source);
+      gcState.diary = payload.diary;
+      gcState.clinical = (
+        typeof GlucoseCoachV3 !== 'undefined' &&
+        typeof GlucoseCoachV3.normalizeClinical === 'function'
+      ) ? GlucoseCoachV3.normalizeClinical(payload.clinical) : payload.clinical;
+
+      if (payload.profile && typeof payload.profile === 'object') {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(payload.profile));
+      }
+
+      const requested = String(payload.ui?.windowDays ?? '90');
+      gcState.windowDays = ['7', '14', '30', '90', 'all'].includes(requested)
+        ? requested
+        : '90';
+      const select = document.querySelector('#window-days');
+      if (select) select.value = gcState.windowDays;
+
+      gcState.lastImport = null;
+      gcSave();
+      gcRender();
+      if (typeof gcShow === 'function') gcShow('overview');
+      return payload;
+    });
+  }
+
+  function ensureCsvImport(csvButton, api) {
+    let label = document.querySelector('#import-complete-csv-label');
+    let input = document.querySelector('#import-complete-csv');
+    if (!label) {
+      label = document.createElement('label');
+      label.id = 'import-complete-csv-label';
+      label.className = 'file-button';
+      label.textContent = 'Vollständige CSV importieren';
+      input = document.createElement('input');
+      input.id = 'import-complete-csv';
+      input.type = 'file';
+      input.accept = '.csv,text/csv';
+      input.hidden = true;
+      label.appendChild(input);
+      csvButton.insertAdjacentElement('afterend', label);
+    }
+    if (!input || input.dataset.bound === 'true') return;
+    input.dataset.bound = 'true';
+    input.addEventListener('change', async (event) => {
+      const progress = document.querySelector('#import-progress');
+      try {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const payload = await restoreCompleteCsv(file, api);
+        if (progress) {
+          progress.textContent =
+            `Vollständige CSV importiert: ${payload.diary.length} Tagebucheinträge und ${payload.clinical.cgm.length} CGM-Werte.`;
+        }
+      } catch (error) {
+        if (progress) progress.textContent = `Import fehlgeschlagen: ${error.message}`;
+        else alert(error.message);
+      }
+      event.target.value = '';
+    });
+  }
+
   function ensureExportControls() {
+    removeLegacyJsonControls();
     const api = root.GlucoseCoachExport;
     const csvButton = document.querySelector('#export-all');
     if (!api || !csvButton) return;
@@ -65,64 +150,13 @@
       );
     };
 
-    let jsonButton = document.querySelector('#export-all-json');
-    if (!jsonButton) {
-      jsonButton = document.createElement('button');
-      jsonButton.type = 'button';
-      jsonButton.id = 'export-all-json';
-      jsonButton.className = 'secondary';
-      csvButton.insertAdjacentElement('afterend', jsonButton);
-    }
-    jsonButton.textContent = 'Gesamtsicherung (JSON)';
-    jsonButton.onclick = () => {
-      downloadText(
-        `glucosecoach-gesamtsicherung-${dateFilenamePart()}.json`,
-        JSON.stringify(api.buildBackupPayload(currentPayload()), null, 2),
-        'application/json;charset=utf-8',
-      );
-    };
-
-    const backupInput = document.querySelector('#import-all');
-    if (!backupInput || backupInput.dataset.completeBackupHandler === 'true') return;
-    backupInput.dataset.completeBackupHandler = 'true';
-    backupInput.onchange = async (event) => {
-      try {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const payload = JSON.parse(await file.text());
-        if (!Array.isArray(payload.diary) || !payload.clinical) {
-          throw new Error('Ungültige Gesamtsicherung');
-        }
-        gcState.diary = payload.diary;
-        gcState.clinical = (
-          typeof GlucoseCoachV3 !== 'undefined' &&
-          typeof GlucoseCoachV3.normalizeClinical === 'function'
-        ) ? GlucoseCoachV3.normalizeClinical(payload.clinical) : payload.clinical;
-        if (payload.profile && typeof payload.profile === 'object') {
-          localStorage.setItem(PROFILE_KEY, JSON.stringify(payload.profile));
-        }
-        if (payload.ui?.windowDays !== undefined) {
-          const requested = String(payload.ui.windowDays);
-          gcState.windowDays = ['7', '14', '30', '90', 'all'].includes(requested)
-            ? requested
-            : '90';
-          const select = document.querySelector('#window-days');
-          if (select) select.value = gcState.windowDays;
-        }
-        gcState.lastImport = null;
-        gcSave();
-        gcRender();
-      } catch (error) {
-        alert(error.message);
-      }
-      event.target.value = '';
-    };
+    ensureCsvImport(csvButton, api);
   }
 
   function installBrowserPatch() {
     if (typeof document === 'undefined' || typeof gcRender !== 'function') return;
     const previousRender = gcRender;
-    gcRender = function renderWithCompleteExport() {
+    gcRender = function renderWithCompleteCsv() {
       previousRender();
       ensureExportControls();
     };
