@@ -395,11 +395,24 @@
     const groups = buildFoodComparisonsWithBolusCutoff(analyses);
     document.querySelectorAll('#food-comparison tr').forEach((row, index) => {
       const group = groups[index];
-      if (!group || row.cells.length < 7 || !group.twoHourFallbackCount) return;
-      const value = Number.isFinite(group.medianTwoHourDelta)
+      if (!group || row.cells.length < 7) return;
+      row.cells[1].textContent = String(group.entries);
+      row.cells[2].textContent = String(group.analyzed);
+      row.cells[3].textContent = group.analyzed && Number.isFinite(group.medianPeakDelta)
+        ? `${formatNumber(group.medianPeakDelta, 0)} mg/dl`
+        : 'wartet auf Daten';
+      row.cells[4].textContent = group.analyzed && Number.isFinite(group.medianMinutesToPeak)
+        ? `${formatNumber(group.medianMinutesToPeak, 0)} min`
+        : '–';
+      row.cells[5].textContent = group.analyzed && Number.isFinite(group.medianMinutesBolusToPeak)
+        ? `${formatNumber(group.medianMinutesBolusToPeak, 0)} min`
+        : '–';
+      const twoHourValue = group.analyzed && Number.isFinite(group.medianTwoHourDelta)
         ? `${formatNumber(group.medianTwoHourDelta, 0)} mg/dl`
         : '–';
-      row.cells[6].textContent = `${value} · ${group.twoHourFallbackCount} verkürzt`;
+      row.cells[6].textContent = group.twoHourFallbackCount
+        ? `${twoHourValue} · ${group.twoHourFallbackCount} verkürzt`
+        : twoHourValue;
     });
 
     const note = document.querySelector('#food-comparison-note');
