@@ -3,12 +3,13 @@
 const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
 const {
-  BACKUP_SCHEMA,
+  CSV_FORMAT,
   CLINICAL_TYPES,
   EXPORT_COLUMNS,
-  buildBackupPayload,
   buildCompleteCsv,
   buildCompleteExportRows,
+  parseCompleteCsv,
+  parseDelimited,
 } = require('../docs/app-export-core.js');
 
 const MINUTE_MS = 60_000;
@@ -20,23 +21,35 @@ function minute(iso) {
 function completePayload() {
   const start = minute('2026-08-01T08:00:00+02:00');
   const clinical = {
-    cgm: [[start, 123, 0]],
-    boluses: [[start + 1, 25, 2.25, 130, 'Bolus']],
-    dailyInsulin: [[start + 2, 10, 20, 10]],
-    basalEvents: [[start + 3, 'Temporär', 30, 80, 0.75, 0.4]],
-    manualGlucose: [[start + 4, 129, 'manuell']],
-    alarms: [[start + 5, 'Pod-Wechsel']],
-    cgmCarbs: [[start + 6, 15]],
-    exerciseEvents: [[start + 7, 'Gehen', 'mittel', 30, 120]],
-    foodEvents: [[start + 8, 'Hafermilch', 12.5, 3, 2, 90, 'Glas', 1]],
-    manualInsulin: [[start + 9, 'Korrektur', 1.5, 'schnell']],
-    medications: [[start + 10, 'Ibuprofen', '400 mg', 'Tablette']],
-    notes: [[start + 11, 'Notiz; "vollständig"']],
+    cgm: [[start, 123, 0], [start + 1, null, -1], [start + 2, null, 1]],
+    boluses: [[start + 3, 25, 2.25, 130, 'Bolus']],
+    dailyInsulin: [[start + 4, 10, 20, 10]],
+    basalEvents: [[start + 5, 'Temporär', 30, 80, 0.75, 0.4]],
+    manualGlucose: [[start + 6, 129, 'manuell']],
+    alarms: [[start + 7, 'Pod-Wechsel']],
+    cgmCarbs: [[start + 8, 15]],
+    exerciseEvents: [[start + 9, 'Gehen', 'mittel', 30, 120]],
+    foodEvents: [[start + 10, 'Hafermilch', 12.5, 3, 2, 90, 'Glas', 1]],
+    manualInsulin: [[start + 11, 'Korrektur', 1.5, 'schnell']],
+    medications: [[start + 12, 'Ibuprofen', '400 mg', 'Tablette']],
+    notes: [[start + 13, 'Notiz; "vollständig"']],
     imports: [{
       at: '2026-08-01T10:00:00.000Z',
       files: 12,
       kinds: ['cgm', 'bolus', 'dailyInsulin', 'basal', 'bg', 'alarm'],
       rejected: 2,
+      cgmAdded: 3,
+      bolusesAdded: 1,
+      dailyInsulinAdded: 1,
+      basalEventsAdded: 1,
+      manualGlucoseAdded: 1,
+      alarmsAdded: 1,
+      cgmCarbsAdded: 1,
+      exerciseAdded: 1,
+      foodAdded: 1,
+      manualInsulinAdded: 1,
+      medicationsAdded: 1,
+      notesAdded: 1,
     }],
     updatedAt: '2026-08-01T10:00:00.000Z',
   };
@@ -57,39 +70,10 @@ function completePayload() {
       sleep: '8',
       stress: '2',
       illness: 'nein',
-      notes: '=SUM(A1:A2); "quoted"',
+      notes: '=SUM(A1:A2); "quoted"\nzweite Zeile',
     }],
     clinical,
   };
-}
-
-function parseSemicolonCsv(source) {
-  const rows = [];
-  let row = [];
-  let field = '';
-  let quoted = false;
-  const text = String(source).replace(/^\uFEFF/, '');
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted && text[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else quoted = !quoted;
-    } else if (!quoted && character === ';') {
-      row.push(field);
-      field = '';
-    } else if (!quoted && (character === '\n' || character === '\r')) {
-      if (character === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-    } else field += character;
-  }
-  row.push(field);
-  if (row.some((value) => value !== '')) rows.push(row);
-  return rows;
 }
 
 async function clickTab(page, id) {
@@ -97,45 +81,46 @@ async function clickTab(page, id) {
   await expect(page.locator(`#${id}`)).toHaveClass(/\bactive\b/);
 }
 
-test('complete CSV and JSON builders preserve every local dataset', () => {
+function expectRestoredPayload(restored, payload) {
+  expect(restored.format).toBe(CSV_FORMAT);
+  expect(restored.profile).toEqual(payload.profile);
+  expect(restored.ui).toEqual(payload.ui);
+  expect(restored.diary).toEqual(payload.diary);
+  for (const [key] of CLINICAL_TYPES) {
+    expect(restored.clinical[key], key).toEqual(payload.clinical[key]);
+  }
+  expect(restored.clinical.imports).toEqual(payload.clinical.imports);
+  expect(restored.clinical.updatedAt).toBe(payload.clinical.updatedAt);
+}
+
+test('one non-redundant CSV round-trips every local dataset', () => {
   const payload = completePayload();
   const rows = buildCompleteExportRows(payload);
-  const dataRows = rows.filter((row) => ['Klinische Daten', 'Kontextdaten'].includes(row.section));
+  const dataRows = rows.filter((row) => CLINICAL_TYPES.some(([, label]) => label === row.dataType));
 
-  expect(dataRows.map((row) => row.dataType)).toEqual(CLINICAL_TYPES.map(([, label]) => label));
-  for (const [key, label] of CLINICAL_TYPES) {
-    const inventory = rows.find((row) => row.section === 'Bestand' && row.dataType === label);
-    expect(inventory?.value, `inventory count for ${key}`).toBe(1);
-    const data = dataRows.find((row) => row.dataType === label);
-    expect(JSON.parse(data.rawJson), `raw JSON for ${key}`).toEqual(payload.clinical[key][0]);
-  }
+  expect(dataRows.map((row) => row.dataType)).toEqual([
+    'CGM', 'CGM', 'CGM', ...CLINICAL_TYPES.slice(1).map(([, label]) => label),
+  ]);
+  expect(rows.some((row) => row.dataType === 'Tagebucheintrag')).toBe(true);
+  expect(rows.some((row) => row.dataType === 'Importvorgang')).toBe(true);
+  expect(rows.some((row) => row.dataType === 'Bestand')).toBe(false);
 
   const csv = buildCompleteCsv(payload);
   expect(csv.startsWith('\uFEFF')).toBe(true);
-  const parsed = parseSemicolonCsv(csv);
+  expect(csv).not.toContain('Rohdaten_JSON');
+  expect(csv).not.toContain('Zeitstempel_lokal');
+  expect(csv).not.toContain('Zeitstempel_ISO');
+  expect(csv).not.toContain('{"id":"diary-complete-export"');
+
+  const parsed = parseDelimited(csv);
   expect(parsed[0]).toEqual(EXPORT_COLUMNS.map(([, label]) => label));
   for (const row of parsed) expect(row).toHaveLength(EXPORT_COLUMNS.length);
 
-  const sectionIndex = parsed[0].indexOf('Bereich');
-  const typeIndex = parsed[0].indexOf('Datentyp');
-  const noteIndex = parsed[0].indexOf('Notiz');
-  const rawIndex = parsed[0].indexOf('Rohdaten_JSON');
-  const diaryRow = parsed.find((row) => row[sectionIndex] === 'Tagebuch');
-  expect(diaryRow[noteIndex]).toBe('\'=SUM(A1:A2); "quoted"');
-  expect(JSON.parse(diaryRow[rawIndex])).toEqual(payload.diary[0]);
-  for (const [, label] of CLINICAL_TYPES) {
-    expect(parsed.some((row) => row[typeIndex] === label)).toBe(true);
-  }
-
-  const backup = buildBackupPayload(payload);
-  expect(backup.schema).toBe(BACKUP_SCHEMA);
-  expect(backup.profile).toEqual(payload.profile);
-  expect(backup.ui).toEqual(payload.ui);
-  expect(backup.diary).toEqual(payload.diary);
-  expect(backup.clinical).toEqual(payload.clinical);
+  const restored = parseCompleteCsv(csv);
+  expectRestoredPayload(restored, payload);
 });
 
-test('browser downloads complete CSV and complete JSON backup', async ({ page }) => {
+test('browser exposes only CSV, downloads it and restores the complete local state', async ({ page }) => {
   const payload = completePayload();
   await page.addInitScript((stored) => {
     localStorage.setItem('glucosecoach-profile-v1', JSON.stringify(stored.profile));
@@ -144,6 +129,12 @@ test('browser downloads complete CSV and complete JSON backup', async ({ page })
   }, payload);
   await page.goto('/');
   await expect(page.locator('#export-all')).toHaveText('Vollständige CSV herunterladen');
+  await expect(page.locator('#app-version')).toHaveText(/^Version \d{4}\.\d{2}\.\d{2}\.\d+ · [a-z0-9-]{7}$/i);
+  await expect(page.getByText(/JSON/i)).toHaveCount(0);
+  for (const selector of ['#export-all-json', '#export-diary', '#import-diary', '#import-all']) {
+    await expect(page.locator(selector)).toHaveCount(0);
+  }
+
   await clickTab(page, 'overview');
   await page.locator('#window-days').selectOption('all');
   await clickTab(page, 'import-data');
@@ -154,24 +145,32 @@ test('browser downloads complete CSV and complete JSON backup', async ({ page })
   ]);
   expect(csvDownload.suggestedFilename()).toMatch(/^glucosecoach-vollstaendig-\d{4}-\d{2}-\d{2}\.csv$/);
   const csv = await fs.readFile(await csvDownload.path(), 'utf8');
-  const parsed = parseSemicolonCsv(csv);
-  const typeIndex = parsed[0].indexOf('Datentyp');
-  for (const [, label] of CLINICAL_TYPES) {
-    expect(parsed.some((row) => row[typeIndex] === label), `browser CSV contains ${label}`).toBe(true);
-  }
-  expect(csv).toContain('profile-complete-export');
-  expect(csv).toContain('diary-complete-export');
-  expect(csv).toContain('Importvorgang');
+  expectRestoredPayload(parseCompleteCsv(csv), payload);
 
-  const [jsonDownload] = await Promise.all([
-    page.waitForEvent('download'),
-    page.locator('#export-all-json').click(),
-  ]);
-  expect(jsonDownload.suggestedFilename()).toMatch(/^glucosecoach-gesamtsicherung-\d{4}-\d{2}-\d{2}\.json$/);
-  const backup = JSON.parse(await fs.readFile(await jsonDownload.path(), 'utf8'));
-  expect(backup.schema).toBe(BACKUP_SCHEMA);
-  expect(backup.profile).toEqual(payload.profile);
-  expect(backup.ui.windowDays).toBe('all');
-  expect(backup.diary).toEqual(payload.diary);
-  for (const [key] of CLINICAL_TYPES) expect(backup.clinical[key]).toEqual(payload.clinical[key]);
+  await page.evaluate(() => {
+    localStorage.removeItem('glucosecoach-profile-v1');
+    localStorage.removeItem('glucosecoach-diary-v1');
+    localStorage.removeItem('glucosecoach-clinical-v1');
+  });
+  await page.reload();
+  await clickTab(page, 'import-data');
+  await page.locator('#import-complete-csv').setInputFiles({
+    name: 'glucosecoach-vollstaendig.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csv, 'utf8'),
+  });
+  await expect(page.locator('#complete-csv-progress')).toContainText('Wiederhergestellt:');
+  await expect(page.locator('#overview')).toHaveClass(/\bactive\b/);
+
+  const stored = await page.evaluate(() => ({
+    profile: JSON.parse(localStorage.getItem('glucosecoach-profile-v1') || 'null'),
+    diary: JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),
+    clinical: JSON.parse(localStorage.getItem('glucosecoach-clinical-v1') || '{}'),
+    window: document.querySelector('#window-days')?.value,
+  }));
+  expect(stored.profile).toEqual(payload.profile);
+  expect(stored.diary).toEqual(payload.diary);
+  for (const [key] of CLINICAL_TYPES) expect(stored.clinical[key]).toEqual(payload.clinical[key]);
+  expect(stored.clinical.imports).toEqual(payload.clinical.imports);
+  expect(stored.window).toBe('all');
 });
