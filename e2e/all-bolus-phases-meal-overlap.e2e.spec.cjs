@@ -1,13 +1,10 @@
 'use strict';
 
-process.env.TZ = 'Europe/Berlin';
-
 const { test, expect } = require('@playwright/test');
 
 const MINUTE_MS = 60_000;
-const TIME_ZONE = 'Europe/Berlin';
-const formatter = new Intl.DateTimeFormat('en-GB', {
-  timeZone: TIME_ZONE,
+const partFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Berlin',
   year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 });
@@ -18,40 +15,15 @@ function minute(iso) {
 
 function timestamp(value) {
   const parts = Object.fromEntries(
-    formatter.formatToParts(new Date(value * MINUTE_MS))
+    partFormatter.formatToParts(new Date(value * MINUTE_MS))
       .filter((part) => part.type !== 'literal')
       .map((part) => [part.type, part.value]),
   );
   return `${parts.day}.${parts.month}.${parts.year} ${parts.hour}:${parts.minute}`;
 }
 
-function decimal(value, digits = 1) {
+function de(value, digits = 1) {
   return `"${Number(value).toFixed(digits).replace('.', ',')}"`;
-}
-
-function cgmCsv(rows) {
-  return [
-    'Name:Synthetisch,Datumsbereich:01.08.2026 - 03.08.2026',
-    'Zeitstempel,CGM-Glukosewert (mg/dl)',
-    ...rows.map((row) => `${timestamp(row[0])},${decimal(row[1], 1)}`),
-  ].join('\n');
-}
-
-function bolusCsv(rows) {
-  return [
-    'Name:Synthetisch,Datumsbereich:01.08.2026 - 03.08.2026',
-    'Zeitstempel,Insulin-Typ,Blutzuckereingabe (mg/dl),Kohlenhydrataufnahme (g),Kohlenhydratverhältnis,Abgegebenes Insulin (E),Anfängliche Abgabe (E),Verzögerte Abgabe (E)',
-    ...rows.map((row) => [
-      timestamp(row[0]),
-      row[4],
-      decimal(row[3], 1),
-      row[1] === null ? '' : decimal(row[1], 1),
-      decimal(20, 1),
-      decimal(row[2], 2),
-      decimal(row[2], 2),
-      '',
-    ].join(',')),
-  ].join('\n');
 }
 
 function phaseCurve(start, delay = 0, shift = 0) {
@@ -64,14 +36,35 @@ function phaseCurve(start, delay = 0, shift = 0) {
     [120, 116],
   ];
   const rows = [];
-  for (let offset = -30; offset < delay; offset += 5) {
-    rows.push([start + offset, 100 + shift, 0]);
-  }
+  for (let offset = -30; offset < delay; offset += 5) rows.push([start + offset, 100 + shift, 0]);
   for (const [offset, value] of shape) {
     if (offset < 0) continue;
     rows.push([start + offset + delay, value + shift, 0]);
   }
   return rows;
+}
+
+function cgmCsv(rows) {
+  return [
+    'Name:Test,Datumsbereich:01.08.2026 - 03.08.2026',
+    'Zeitstempel,CGM-Glukosewert (mg/dl)',
+    ...rows.sort((a, b) => a[0] - b[0]).map((row) => `${timestamp(row[0])},${de(row[1], 1)}`),
+  ].join('\n');
+}
+
+function bolusCsv(rows) {
+  return [
+    'Name:Test,Datumsbereich:01.08.2026 - 03.08.2026',
+    [
+      'Zeitstempel', 'Insulin-Typ', 'Blutzuckereingabe (mg/dl)',
+      'Kohlenhydrataufnahme (g)', 'Kohlenhydratverhältnis',
+      'Abgegebenes Insulin (E)', 'Anfängliche Abgabe (E)', 'Verzögerte Abgabe (E)',
+    ].join(','),
+    ...rows.sort((a, b) => a[0] - b[0]).map((row) => [
+      timestamp(row[0]), row[4], de(row[3] ?? 100, 1), de(row[1] ?? 0, 1),
+      de(20, 1), de(row[2], 2), '', '',
+    ].join(',')),
+  ].join('\n');
 }
 
 async function clickTab(page, id) {
@@ -129,6 +122,9 @@ test('all positive boluses produce three arithmetic mean phase times', async ({ 
     'Ø 90 min · n=2',
     '2',
   ]);
+  await expect(card.locator('#all-bolus-phase-note')).toContainText(
+    'arithmetische Mittelwerte ab der jeweiligen Bolusabgabe',
+  );
   await expect(page.locator('#insulin-action .notice.warn')).toContainText(
     'alle positiven Boli als Kandidaten',
   );
