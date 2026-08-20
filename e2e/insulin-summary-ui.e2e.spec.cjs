@@ -211,7 +211,7 @@ test('insulin events are compact, date-filterable and every added mean is indepe
   const expectedAll = independentMeanDom(expectedEvents);
 
   await page.goto('/');
-  await expect(page.locator('#export-all')).toHaveText('Vollständige CSV herunterladen');
+  await expect(page.locator('#export-all')).toHaveText('CSV-ZIP herunterladen');
   await importFixture(page, fixture);
   await clickTab(page, 'insulin-action');
 
