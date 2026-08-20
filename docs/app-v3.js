@@ -21,15 +21,6 @@
     return;
   }
 
-  const cleanupStyle = document.createElement('style');
-  cleanupStyle.id = 'legacy-json-control-hider';
-  cleanupStyle.textContent = `
-    #export-diary,
-    label:has(#import-diary),
-    label:has(#import-all) { display: none !important; }
-  `;
-  document.head.appendChild(cleanupStyle);
-
   function loadScript(src, onload) {
     const script = document.createElement('script');
     script.src = src;
@@ -45,20 +36,18 @@
     document.head.appendChild(script);
   }
 
-  loadScript('version.js', () =>
-    loadScript('app-v3-core.js', () =>
-      loadScript('app-importers.js', () =>
-        loadScript('app-importers-context.js', () =>
-          loadScript('app-ui-contract.js', () =>
-            loadScript('app-meal-window.js', () =>
-              loadScript('app-insulin-action.js', () =>
-                loadScript('app-export-core.js', () =>
-                  loadScript('app-export-ui.js', () =>
-                    loadScript('app-insulin-summary-core.js', () =>
-                      loadScript('app-insulin-summary-ui.js', () =>
-                        loadScript('app-compact-lists.js', () =>
-                          loadScript('app-version.js'),
-                        ),
+  loadScript('app-v3-core.js', () =>
+    loadScript('app-importers.js', () =>
+      loadScript('app-importers-context.js', () =>
+        loadScript('app-ui-contract.js', () =>
+          loadScript('app-meal-window.js', () =>
+            loadScript('app-insulin-action.js', () =>
+              loadScript('app-export-core.js', () =>
+                loadScript('app-export-ui.js', () =>
+                  loadScript('app-insulin-summary-core.js', () =>
+                    loadScript('app-insulin-summary-ui.js', () =>
+                      loadScript('app-compact-lists.js', () =>
+                        loadScript('app-version.js'),
                       ),
                     ),
                   ),
