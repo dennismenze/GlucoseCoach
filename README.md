@@ -1,19 +1,19 @@
 # GlucoseCoach
 
-GlucoseCoach ist eine statische Web-App zur persönlichen retrospektiven Auswertung von CGM-, Bolus- und Mahlzeitendaten. Die Datenerfassung kann vollständig in Glooko bleiben: GlucoseCoach importiert den Glooko-Webexport und übernimmt nur Deutung und Auswertung.
+GlucoseCoach ist eine statische Web-App zur persönlichen retrospektiven Auswertung von CGM-, Bolus- und Mahlzeitendaten. Glooko kann als zusätzliche Datenquelle dienen; die bisherige Eingabe im GlucoseCoach-Tagebuch bleibt vollständig erhalten. Beide Quellen werden gemeinsam ausgewertet.
 
-## Glooko als zentrale Datenerfassung
+## Glooko als zusätzliche Datenquelle
 
-Der bevorzugte Ablauf ist:
+Ein möglicher Ablauf ist:
 
-1. Gerätewerte, Insulin und Essen in Glooko erfassen bzw. synchronisieren.
+1. Gerätewerte, Insulin und auf Wunsch Essen in Glooko erfassen bzw. synchronisieren.
 2. Im Glooko-Webkonto den gewünschten Zeitraum als ZIP exportieren.
 3. Das ZIP in GlucoseCoach ablegen.
-4. In GlucoseCoach als Mahlzeitenquelle **Glooko-Lebensmitteleinträge** verwenden.
+4. Lokale Tagebucheinträge weiterhin direkt in GlucoseCoach ergänzen oder bearbeiten.
 
 Der Import verarbeitet die CSV-Dateien auch aus Unterordnern des ZIP. `food_data_*.csv` und – falls kein benannter Lebensmitteleintrag vorhanden ist – `cgm_carbs_data_*.csv` werden als schreibgeschützte Mahlzeitenanker verwendet. Mehrere Lebensmittel mit demselben Zeitstempel werden zu einer Mahlzeit zusammengefasst. CGM- und Bolusdaten werden danach mit denselben retrospektiven Regeln wie bei lokalen Tagebucheinträgen verknüpft.
 
-Das lokale GlucoseCoach-Tagebuch bleibt als Übergangs- und Fallbackmodus erhalten. In einem frischen Browser wird Glooko automatisch als Mahlzeitenquelle gewählt, sobald ein Export mit Lebensmitteln oder Kohlenhydraten importiert wurde. Existieren bereits lokale Mahlzeiten, kann die Quelle im Reiter **Tagebuch** umgeschaltet werden.
+Das lokale GlucoseCoach-Tagebuch bleibt immer sichtbar und nutzbar. Glooko-Mahlzeiten werden zusätzlich eingeblendet und gemeinsam mit lokalen Einträgen analysiert. Erkennt GlucoseCoach zu einem Glooko-Eintrag bereits eine zeitlich und inhaltlich passende lokale Mahlzeit, wird diese für die Analyse nicht doppelt gezählt; der bearbeitbare lokale Eintrag bleibt maßgeblich.
 
 Eine offizielle direkte Glooko-Kontosynchronisation ist für individuelle Nutzerkonten nicht verfügbar. Glooko stellt die Direct API nur im Rahmen einer Geschäftsbeziehung mit zugewiesenem API-Schlüssel bereit. Deshalb enthält die öffentliche GitHub-Pages-App bewusst weder Glooko-Zugangsdaten noch inoffizielles Login-Scraping. Die technische Abgrenzung für einen späteren offiziellen API-Adapter steht in [`GLOOKO_INTEGRATION.md`](GLOOKO_INTEGRATION.md).
 
@@ -34,7 +34,8 @@ Die App hat derzeit keine Benutzerkonten und keine Cloud-Synchronisation. Für m
 ## Funktionen
 
 - nativer Glooko-ZIP-Import einschließlich Geräte-, Insulin-, Lebensmittel-, Kohlenhydrat-, Sport-, Medikamenten- und Notizdateien
-- wählbare Mahlzeitenquelle: schreibgeschützte Glooko-Einträge oder lokales GlucoseCoach-Tagebuch
+- kombinierte Mahlzeitenbasis aus schreibgeschützten Glooko-Einträgen und weiterhin bearbeitbarem GlucoseCoach-Tagebuch
+- quellenübergreifende Duplikaterkennung für zeitlich passende Mahlzeiten
 - CGM-Kennzahlen für 7, 14, 30, 90 Tage oder den gesamten lokalen Bestand
 - Bereichszeiten, Mittelwert, GMI-Schätzung und Variationskoeffizient
 - Zeitfenster mit relativ häufigeren hohen oder niedrigen Messwerten
@@ -52,7 +53,7 @@ Die veröffentlichte App liegt unter `docs/`. GitHub Pages liefert `main` + `/do
 
 Die schnellen Vertrags- und Logiktests liegen unter `tests/`. Zusätzlich gibt es eine Playwright-E2E-Suite unter `e2e/`.
 
-Die E2E-Suite erzeugt für mehrere feste Seeds synthetische, aber physiologisch plausible CGM-Verläufe sowie alle zwölf unterstützten Datentypen. Sie trägt lokale Fallback-Tagebucheinträge über das echte Browserformular ein, importiert die CSV-Dateien über den echten File-Input und prüft anschließend alle Bereiche. Ein eigener Browservertrag importiert zusätzlich einen nativen Glooko-ZIP mit Unterordnern, mehreren Lebensmitteln pro Mahlzeit und leerem lokalem Tagebuch. Er weist nach, dass der lokale Speicher leer bleibt, Glooko automatisch Mahlzeitenquelle wird und die Mahlzeit vollständig in die CGM-/Bolusanalyse eingeht.
+Die E2E-Suite erzeugt für mehrere feste Seeds synthetische, aber physiologisch plausible CGM-Verläufe sowie alle zwölf unterstützten Datentypen. Sie trägt lokale Tagebucheinträge über das echte Browserformular ein, importiert die CSV-Dateien über den echten File-Input und prüft anschließend alle Bereiche. Ein eigener Browservertrag importiert zusätzlich einen nativen Glooko-ZIP mit Unterordnern und mehreren Lebensmitteln pro Mahlzeit. Er weist nach, dass Glooko-Mahlzeiten schreibgeschützt ergänzt werden, das lokale Formular sichtbar bleibt, lokale Mahlzeiten weiterhin gespeichert werden können und beide Quellen gemeinsam in die Analyse eingehen.
 
 Zusätzliche Roundtrip-Tests prüfen die exakten CSV-Dateinamen und Kopfzeilen, den ZIP-Download, den Import aus einem zuvor geleerten Browser sowie beide Eingabewege: Dateiauswahl und Drag-and-drop.
 
