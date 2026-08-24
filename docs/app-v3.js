@@ -5,6 +5,7 @@
     if (typeof module !== 'undefined' && module.exports) {
       const mealWindow = require('./app-meal-window.js');
       const mealOverlap = require('./app-meal-overlap-fallback.js');
+      const mealManagement = require('./app-meal-management.js');
       const insulinAction = require('./app-insulin-action.js');
       const allBolusPhases = require('./app-all-bolus-phases.js');
       const importers = require('./app-importers-context.js');
@@ -19,6 +20,7 @@
         ...require('./app-ui-contract.js'),
         ...mealWindow,
         ...mealOverlap,
+        ...mealManagement,
         ...insulinAction,
         ...exportCore,
         ...zipExchange,
@@ -28,9 +30,9 @@
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
-        analyzeMeals: mealOverlap.analyzeMeals,
-        analyzeMealAdaptivePeak: mealOverlap.analyzeMealAdaptivePeak,
-        buildFoodComparisons: mealOverlap.buildFoodComparisons,
+        analyzeMeals: mealManagement.analyzeMeals,
+        analyzeMealAdaptivePeak: mealManagement.analyzeMealAdaptivePeak,
+        buildFoodComparisons: mealManagement.buildFoodComparisons,
       };
     }
     return;
@@ -69,8 +71,10 @@
                                 loadScript('app-compact-lists.js', () =>
                                   loadScript('app-insulin-page-ui.js', () =>
                                     loadScript('app-meal-page-ui.js', () =>
-                                      loadScript('app-glooko-mode.js', () =>
-                                        loadScript('app-version.js'),
+                                      loadScript('app-meal-management.js', () =>
+                                        loadScript('app-glooko-mode.js', () =>
+                                          loadScript('app-version.js'),
+                                        ),
                                       ),
                                     ),
                                   ),
