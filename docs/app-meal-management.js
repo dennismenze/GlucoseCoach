@@ -284,10 +284,10 @@
   }
 
   function ensureMergeControls() {
-    const aside = document.querySelector('#diary article.card.side');
     const anchor = document.querySelector('#diary-entries-disclosure') ||
       document.querySelector('#entries');
-    if (!aside || !anchor) return null;
+    const container = anchor?.parentElement;
+    if (!anchor || !container || !container.closest('#diary')) return null;
 
     let controls = document.querySelector('#meal-merge-controls');
     if (!controls) {
@@ -306,7 +306,7 @@
         'type="button" disabled>Markierte Mahlzeiten zusammenlegen</button></div>' +
         '<div id="meal-merge-status" class="meal-merge-status muted" role="status" ' +
         'aria-live="polite"></div>';
-      aside.insertBefore(controls, anchor);
+      container.insertBefore(controls, anchor);
     }
     return controls;
   }
