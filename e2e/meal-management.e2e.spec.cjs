@@ -56,10 +56,14 @@ test('local meals with variant names can be merged and persist as one comparison
   ];
 
   await page.addInitScript((storedDiary) => {
-    localStorage.setItem('glucosecoach-diary-v1', JSON.stringify(storedDiary));
-    localStorage.setItem('glucosecoach-clinical-v1', JSON.stringify({
-      cgm: [], boluses: [], imports: [], updatedAt: null,
-    }));
+    if (!localStorage.getItem('glucosecoach-diary-v1')) {
+      localStorage.setItem('glucosecoach-diary-v1', JSON.stringify(storedDiary));
+    }
+    if (!localStorage.getItem('glucosecoach-clinical-v1')) {
+      localStorage.setItem('glucosecoach-clinical-v1', JSON.stringify({
+        cgm: [], boluses: [], imports: [], updatedAt: null,
+      }));
+    }
   }, diary);
 
   await page.goto('/');
