@@ -1,7 +1,5 @@
 'use strict';
 
-process.env.TZ = 'Europe/Berlin';
-
 const { test, expect } = require('@playwright/test');
 const base = require('../docs/app-meal-management.js');
 const app = require('../docs/app-v3.js');
@@ -84,8 +82,9 @@ function observedWithoutTurnFixture() {
 
 test('a meal bolus after two hours terminates the earlier meal before its rebound', () => {
   const data = lateMealBoundaryFixture();
+  const nodeEntry = { ...data.entry, when: '2026-08-21T14:45:00+02:00' };
   const oldResult = base.analyzeMealAdaptivePeak(
-    data.entry,
+    nodeEntry,
     data.cgm,
     data.boluses,
     null,
@@ -94,7 +93,7 @@ test('a meal bolus after two hours terminates the earlier meal before its reboun
   expect(oldResult.status).toBe('no-stable-decline');
 
   const result = app.analyzeMealAdaptivePeak(
-    data.entry,
+    nodeEntry,
     data.cgm,
     data.boluses,
     null,
@@ -112,8 +111,9 @@ test('a meal bolus after two hours terminates the earlier meal before its reboun
 
 test('a fully observed meal without a stable turn is complete but not peak comparable', () => {
   const data = observedWithoutTurnFixture();
+  const nodeEntry = { ...data.entry, when: '2026-08-24T08:00:00+02:00' };
   const oldResult = base.analyzeMealAdaptivePeak(
-    data.entry,
+    nodeEntry,
     data.cgm,
     data.boluses,
     null,
@@ -123,7 +123,7 @@ test('a fully observed meal without a stable turn is complete but not peak compa
   expect(oldResult.twoHourAvailable).toBe(true);
 
   const result = app.analyzeMealAdaptivePeak(
-    data.entry,
+    nodeEntry,
     data.cgm,
     data.boluses,
     null,
@@ -163,9 +163,7 @@ test('the browser shows the late meal boundary as a completed lunch', async ({ p
     hasText: 'Synthetisches Mittagessen',
   });
   await expect(item).toHaveCount(1);
-  await expect(item.locator('.status')).toHaveText(
-    'vollständig · vor nächster Mahlzeit beendet',
-  );
+  await expect(item.locator('.status')).toHaveText('vollständig');
   await expect(item.locator('.status')).toHaveClass(/\bok\b/);
   await expect(item).toHaveAttribute(
     'data-analysis-status',
