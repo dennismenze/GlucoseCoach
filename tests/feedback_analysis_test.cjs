@@ -5,10 +5,24 @@ const {
   buildNightRiseAnalysis,
   timingBucket,
 } = require('../docs/app-feedback-ui.js');
+const { buildCombinedAnalysisDiary } = require('../docs/app-feedback-glooko.js');
 
 assert.equal(timingBucket(-15).key, 'before');
 assert.equal(timingBucket(0).key, 'around');
 assert.equal(timingBucket(25).key, 'late');
+
+const combinedDiary = buildCombinedAnalysisDiary(
+  [{ id: 'local' }],
+  { foodEvents: [[1, 'Import']] },
+  {
+    buildAnalysisDiary(local, clinical) {
+      assert.equal(local[0].id, 'local');
+      assert.equal(clinical.foodEvents[0][1], 'Import');
+      return [...local, { id: 'glooko' }];
+    },
+  },
+);
+assert.deepEqual(combinedDiary.map((entry) => entry.id), ['local', 'glooko']);
 
 const mealInsights = buildMealTimingInsights([
   { complete: true, entry: { food: 'Porridge' }, bolusOffset: -15, peakDelta: 24, twoHourDelta: 8 },
