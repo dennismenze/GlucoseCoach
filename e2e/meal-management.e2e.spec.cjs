@@ -156,7 +156,7 @@ test('a reliable window cut off before the turn is complete but has no final pea
   );
 
   const turn = item.locator('.analysis-grid > div').filter({
-    hasText: 'CGM-Wendepunkt-Proxy (nutzbares Fenster)',
+    hasText: 'Stabil bestätigter Rückgang (nutzbares Fenster)',
   });
   await expect(turn.locator('strong')).toContainText(
     'nutzbares Fenster endete 91 min nach Essen',
