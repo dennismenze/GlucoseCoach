@@ -14,6 +14,7 @@
       const zipExchange = require('./app-zip64-compat.js');
       const insulinSummaryCore = require('./app-insulin-summary-core.js');
       const glookoMode = require('./app-glooko-mode.js');
+      const feedbackUi = require('./app-feedback-ui.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -29,6 +30,7 @@
         ...insulinSummaryCore,
         ...allBolusPhases,
         ...glookoMode,
+        ...feedbackUi,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
@@ -82,7 +84,9 @@
                                       loadScript('app-meal-management.js', () =>
                                         loadScript('app-meal-boundary.js', () =>
                                           loadScript('app-glooko-mode.js', () =>
-                                            loadScript('app-version.js'),
+                                            loadScript('app-feedback-ui.js', () =>
+                                              loadScript('app-version.js'),
+                                            ),
                                           ),
                                         ),
                                       ),
