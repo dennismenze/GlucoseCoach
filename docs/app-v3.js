@@ -6,6 +6,7 @@
       const mealWindow = require('./app-meal-window.js');
       const mealOverlap = require('./app-meal-overlap-fallback.js');
       const mealManagement = require('./app-meal-management.js');
+      const mealBoundary = require('./app-meal-boundary.js');
       const insulinAction = require('./app-insulin-action.js');
       const allBolusPhases = require('./app-all-bolus-phases.js');
       const importers = require('./app-importers-context.js');
@@ -21,6 +22,7 @@
         ...mealWindow,
         ...mealOverlap,
         ...mealManagement,
+        ...mealBoundary,
         ...insulinAction,
         ...exportCore,
         ...zipExchange,
@@ -30,17 +32,23 @@
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
-        analyzeMeals: mealManagement.analyzeMeals,
-        analyzeMealAdaptivePeak: mealManagement.analyzeMealAdaptivePeak,
-        buildFoodComparisons: mealManagement.buildFoodComparisons,
+        analyzeMeals: mealBoundary.analyzeMeals,
+        analyzeMealAdaptivePeak: mealBoundary.analyzeMealAdaptivePeak,
+        buildFoodComparisons: mealBoundary.buildFoodComparisons,
       };
     }
     return;
   }
 
+  function scriptSource(src) {
+    if (src === 'version.js') return `${src}?refresh=${Date.now()}`;
+    const version = String(globalThis.GLUCOSECOACH_VERSION || '').trim();
+    return version ? `${src}?v=${encodeURIComponent(version)}` : src;
+  }
+
   function loadScript(src, onload) {
     const script = document.createElement('script');
-    script.src = src;
+    script.src = scriptSource(src);
     script.defer = false;
     script.onload = () => {
       if (onload) onload();
@@ -72,8 +80,10 @@
                                   loadScript('app-insulin-page-ui.js', () =>
                                     loadScript('app-meal-page-ui.js', () =>
                                       loadScript('app-meal-management.js', () =>
-                                        loadScript('app-glooko-mode.js', () =>
-                                          loadScript('app-version.js'),
+                                        loadScript('app-meal-boundary.js', () =>
+                                          loadScript('app-glooko-mode.js', () =>
+                                            loadScript('app-version.js'),
+                                          ),
                                         ),
                                       ),
                                     ),
