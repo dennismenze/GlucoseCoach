@@ -258,7 +258,7 @@
       const cells = item.querySelectorAll('.analysis-grid > div');
       if (cells.length < 6) return;
       cells[2].querySelector('span').textContent = analysis.peakComplete
-        ? 'Peak vor nächstem Mahlzeitenbolus'
+        ? 'Peak nach Mahlzeitenbolus'
         : 'Endgültiger Peak';
       cells[2].querySelector('strong').textContent = analysis.peakComplete
         ? formatPeak(analysis)
