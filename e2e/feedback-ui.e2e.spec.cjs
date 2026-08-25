@@ -93,7 +93,7 @@ test('feedback cleanup, diary sections and food favorites work together', async 
   await clickTab(page, 'insulin-action');
   await expect(page.locator('#all-bolus-phases-card h2')).toHaveText('Beobachtete Kurvenänderung nach Boli');
   await expect(page.getByText('vollständige Drei-Phasen-Verläufe', { exact: true })).not.toBeVisible();
-  await expect(page.locator('#insulin-events').closest('article.card')).not.toBeVisible();
+  await expect(page.locator('article.card:has(#insulin-events)')).not.toBeVisible();
   await expect(page.getByText('Sekundär: Mittelwerte streng isolierter Korrekturboli', { exact: true })).not.toBeVisible();
 
   await clickTab(page, 'import-data');
