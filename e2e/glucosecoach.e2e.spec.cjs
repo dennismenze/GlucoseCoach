@@ -259,7 +259,7 @@ async function assertMealAnalysis(page, fixture) {
     await expectGridValue(item, 'Peak nach Mahlzeitenbolus', expectedPeakText(expected));
     await expectGridValue(item, '2-h-Wert', mg(expected.twoHour));
     await expectGridValue(item, 'maßgeblicher Mahlzeitenbolus', expectedBolusText(expected));
-    await expectGridValue(item, 'CGM-Wendepunkt-Proxy', expectedTurnText(expected));
+    await expectGridValue(item, 'Stabil bestätigter Rückgang', expectedTurnText(expected));
   }
 
   const tableRows = page.locator('#food-comparison tr');
