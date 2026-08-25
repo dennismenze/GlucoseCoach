@@ -171,7 +171,7 @@ test('the browser shows the late meal boundary as a completed lunch', async ({ p
   );
 
   const peak = item.locator('.analysis-grid > div').filter({
-    hasText: 'Peak vor nächstem Mahlzeitenbolus',
+    hasText: 'Peak nach Mahlzeitenbolus',
   });
   await expect(peak.locator('strong')).toContainText('172 mg/dl');
   await expect(peak.locator('strong')).toContainText('130 min nach Essen');
