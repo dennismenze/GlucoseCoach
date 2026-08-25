@@ -16,6 +16,7 @@
       const glookoMode = require('./app-glooko-mode.js');
       const feedbackUi = require('./app-feedback-ui.js');
       const feedbackGlooko = require('./app-feedback-glooko.js');
+      const feedbackPolish = require('./app-feedback-polish.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -33,6 +34,7 @@
         ...glookoMode,
         ...feedbackUi,
         ...feedbackGlooko,
+        ...feedbackPolish,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
@@ -88,7 +90,9 @@
                                           loadScript('app-glooko-mode.js', () =>
                                             loadScript('app-feedback-ui.js', () =>
                                               loadScript('app-feedback-glooko.js', () =>
-                                                loadScript('app-version.js'),
+                                                loadScript('app-feedback-polish.js', () =>
+                                                  loadScript('app-version.js'),
+                                                ),
                                               ),
                                             ),
                                           ),

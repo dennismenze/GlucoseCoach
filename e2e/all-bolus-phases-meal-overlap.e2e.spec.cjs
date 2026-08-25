@@ -90,7 +90,7 @@ async function importFiles(page, cgm, boluses) {
   await expect(page.locator('#import-progress')).toContainText('Fertig:');
 }
 
-test('all positive boluses produce three arithmetic mean phase times', async ({ page }) => {
+test('all positive boluses keep their numeric phase contract after the UI cleanup', async ({ page }) => {
   const first = minute('2026-08-01T08:00:00+02:00');
   const second = minute('2026-08-02T08:00:00+02:00');
   const cgm = [...phaseCurve(first), ...phaseCurve(second, 10, 5)];
@@ -105,28 +105,33 @@ test('all positive boluses produce three arithmetic mean phase times', async ({ 
 
   const card = page.locator('#all-bolus-phases-card');
   await expect(card).toBeVisible();
-  await expect(card.locator('h2')).toHaveText('Beobachteter Wirkeintritt über alle Boli');
-  await expect(card.locator('#all-bolus-phase-summary span')).toHaveText([
+  await expect(card.locator('h2')).toHaveText('Beobachtete Kurvenänderung nach Boli');
+
+  const visibleSummary = card.locator('#all-bolus-phase-summary > div:not([hidden])');
+  await expect(visibleSummary.locator('span')).toHaveText([
     'positive Boli geprüft',
     'mit ausreichendem CGM-Fenster',
     'Anstieg wird schwächer',
-    'Plateau / Wendepunkt',
-    'anhaltender Abfall beginnt',
-    'vollständige Drei-Phasen-Verläufe',
+    'Wendepunkt',
+    'stabiler Rückgang beginnt',
   ]);
-  await expect(card.locator('#all-bolus-phase-summary strong')).toHaveText([
+  await expect(visibleSummary.locator('strong')).toHaveText([
     '2',
     '2',
-    'Ø 55 min · n=2',
-    'Ø 75 min · n=2',
-    'Ø 90 min · n=2',
-    '2',
+    'Ø 55 min',
+    'Ø 75 min',
+    'Ø 90 min',
   ]);
-  await expect(card.locator('#all-bolus-phase-note')).toContainText(
-    'arithmetische Mittelwerte ab der jeweiligen Bolusabgabe',
+
+  const removedCompleteCount = card.locator('#all-bolus-phase-summary > div')
+    .filter({ hasText: 'vollständige Drei-Phasen-Verläufe' });
+  await expect(removedCompleteCount).not.toBeVisible();
+  await expect(card.locator('#all-bolus-phase-note')).not.toBeVisible();
+  await expect(page.locator('#insulin-action .notice.warn')).toContainText(
+    'Retrospektive Kurvenauswertung',
   );
   await expect(page.locator('#insulin-action .notice.warn')).toContainText(
-    'alle positiven Boli als Kandidaten',
+    'nur Korrekturboli ohne protokollierte Mahlzeit',
   );
 });
 
