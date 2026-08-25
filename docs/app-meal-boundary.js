@@ -251,7 +251,7 @@
       if (status) {
         status.className = 'status ok';
         status.textContent = analysis.status === 'complete-before-following-meal-bolus'
-          ? 'vollständig · vor nächster Mahlzeit beendet'
+          ? 'vollständig'
           : 'vollständig · kein stabiler Wendepunkt';
       }
 
