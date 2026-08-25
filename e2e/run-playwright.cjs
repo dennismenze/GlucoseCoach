@@ -3,12 +3,16 @@
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 
-const patch = path.resolve(__dirname, 'oracle-two-hour-patch.cjs');
-const preload = `--require=${patch}`;
+const patches = [
+  path.resolve(__dirname, 'oracle-two-hour-patch.cjs'),
+  path.resolve(__dirname, 'ui-compat-preload.cjs'),
+];
+const preloads = patches.map((patch) => `--require=${patch}`);
 const existing = String(process.env.NODE_OPTIONS || '').trim();
-const nodeOptions = existing.includes(preload)
-  ? existing
-  : [existing, preload].filter(Boolean).join(' ');
+const nodeOptions = [
+  existing,
+  ...preloads.filter((preload) => !existing.includes(preload)),
+].filter(Boolean).join(' ');
 const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const result = spawnSync(
   command,

@@ -93,6 +93,7 @@ async function clickTab(page, id) {
 
 async function addDiaryEntry(page, entry) {
   await clickTab(page, 'diary');
+  await page.locator('#entry-type').selectOption('meal');
   await page.locator('#when').fill(entry.when);
   await page.locator('#occasion').selectOption({ label: entry.occasion || 'Frühstück' });
   await page.locator('#food').fill(entry.food || 'Fettreiches Testessen');
@@ -100,7 +101,6 @@ async function addDiaryEntry(page, entry) {
   await page.locator('#fat').fill(entry.fat || '25');
   await page.locator('#protein').fill(entry.protein || '15');
   await page.locator('#fiber').fill(entry.fiber || '4');
-  await page.locator('#illness').selectOption('nein');
   await page.locator('#diary-form button[type="submit"]').click();
   await expect(page.locator('#meal-analysis')).toHaveClass(/\bactive\b/);
 }
@@ -140,13 +140,11 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   ];
 
   await page.goto('/');
-  const intro = page.locator('#meal-analysis article.card.full p.muted');
-  await expect(intro).toContainText('nicht mehr auf zwei Stunden begrenzt');
-  await expect(intro).toContainText('Bis zu fünf Stunden');
-  await expect(intro).toContainText('mahlzeitennaher positiver');
-  await expect(intro).toContainText('ohne Kohlenhydratangabe gilt immer als Korrekturbolus');
-  await expect(intro).toContainText('starten den Peak nicht neu');
-  await expect(intro).toContainText('Korrekturboli behandelt');
+  const intro = page.locator('#meal-method-explanation p.muted');
+  await expect(intro).toContainText('stabil bestätigten Rückgang');
+  await expect(intro).toContainText('20 Minuten');
+  await expect(intro).toContainText('mindestens 8 mg/dl');
+  await expect(intro).toContainText('nicht den pharmakologischen Wirkeintritt');
 
   for (const entry of entries) await addDiaryEntry(page, entry);
 
@@ -176,7 +174,7 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
     .toHaveText('240 mg/dl · 110 min nach Mahlzeitenbolus · 120 min nach Essen');
   await expect((await gridCell(newest, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
     .toHaveText('1,2 E · 10 min nach Essen · 1 spätere Bolusgabe vor dem Wendepunkt als mögliche Korrektur behandelt');
-  await expect((await gridCell(newest, 'CGM-Wendepunkt-Proxy')).locator('strong'))
+  await expect((await gridCell(newest, 'Stabil bestätigter Rückgang')).locator('strong'))
     .toHaveText('110 min nach Mahlzeitenbolus · 120 min nach Essen');
   await expect((await gridCell(newest, '2-h-Wert')).locator('strong')).toHaveText('240 mg/dl');
 
@@ -184,7 +182,7 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
     .toHaveText('223 mg/dl · 195 min nach Mahlzeitenbolus · 205 min nach Essen');
   await expect((await gridCell(oldest, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
     .toHaveText('1,2 E · 10 min nach Essen · 1 spätere Bolusgabe vor dem Wendepunkt als mögliche Korrektur behandelt');
-  await expect((await gridCell(oldest, 'CGM-Wendepunkt-Proxy')).locator('strong'))
+  await expect((await gridCell(oldest, 'Stabil bestätigter Rückgang')).locator('strong'))
     .toHaveText('195 min nach Mahlzeitenbolus · 205 min nach Essen');
   await expect((await gridCell(oldest, '2-h-Wert')).locator('strong')).toHaveText('172 mg/dl');
 
@@ -198,8 +196,7 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   await expect(comparison.locator('td')).toHaveText([
     'Fettreiches Testessen', '2', '2', '132 mg/dl', '163 min', '153 min', '106 mg/dl',
   ]);
-  await expect(page.locator('#food-comparison-note')).toContainText('mehr als zwei oder drei Stunden');
-  await expect(page.locator('#food-comparison-note')).toContainText('ersetzen den zugeordneten Mahlzeitenbolus nicht');
+  await expect(page.locator('#food-comparison-note')).not.toBeVisible();
 
   await clickTab(page, 'recommendations');
   const recommendation = page.locator('#recommendation-list .rec').filter({ hasText: 'Fettreiches Testessen' });
@@ -249,8 +246,6 @@ test('blank-carbohydrate bolus cannot anchor a meal peak', async ({ page }) => {
     .toHaveText('nicht bestimmbar');
   await expect((await gridCell(item, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
     .toHaveText('kein mahlzeitennaher positiver Bolus mit positiver KH-Angabe (±60 min) gefunden');
-  await expect(page.locator('#meal-analysis article.card.full p.muted'))
-    .toContainText('ohne Kohlenhydratangabe gilt immer als Korrekturbolus');
 
   expect(errors.consoleErrors, 'browser console errors').toEqual([]);
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
@@ -285,14 +280,13 @@ test('local CGM dip is rejected until the sustained post-meal-bolus decline is c
     .toHaveText('161 mg/dl · 56 min nach Mahlzeitenbolus · 75 min nach Essen');
   await expect((await gridCell(item, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
     .toHaveText('0,2 E · 19 min nach Essen');
-  await expect((await gridCell(item, 'CGM-Wendepunkt-Proxy')).locator('strong'))
+  await expect((await gridCell(item, 'Stabil bestätigter Rückgang')).locator('strong'))
     .toHaveText('56 min nach Mahlzeitenbolus · 75 min nach Essen');
 
-  const intro = page.locator('#meal-analysis article.card.full p.muted');
-  await expect(intro).toContainText('20 Minuten Hysterese');
+  const intro = page.locator('#meal-method-explanation p.muted');
+  await expect(intro).toContainText('20 Minuten');
   await expect(intro).toContainText('mindestens 8 mg/dl');
-  await expect(intro).toContainText('maximal 3 mg/dl späterem Rebound');
-  await expect(intro).toContainText('kein Nachweis eines pharmakologischen Insulin-Wirkbeginns');
+  await expect(intro).toContainText('nicht den pharmakologischen Wirkeintritt');
 
   await clickTab(page, 'quality');
   const declineRow = page.locator('#quality-body tr').filter({ hasText: 'Anhaltender Rückgangs-Proxy' });

@@ -121,7 +121,7 @@ test('the UI marks only the two-hour value as missing and keeps the event in com
   await expect(twoHour.locator('strong')).toHaveText('–');
 
   const turn = missingCard.locator('.analysis-grid > div').filter({
-    hasText: 'CGM-Wendepunkt-Proxy',
+    hasText: 'Stabil bestätigter Rückgang',
   });
   await expect(turn.locator('strong')).not.toHaveText('nicht stabil erkennbar');
 

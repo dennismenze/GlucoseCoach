@@ -124,19 +124,20 @@ test('meal explanations are collapsed and food comparisons show arithmetic means
   await expect(method).toBeAttached();
   await expect(comparisonExplanation).toBeAttached();
   expect(await method.evaluate((element) => element.open)).toBe(false);
-  expect(await comparisonExplanation.evaluate((element) => element.open)).toBe(false);
   await expect(method.locator('p')).not.toBeVisible();
-  await expect(comparisonExplanation.locator('#food-comparison-note')).not.toBeVisible();
+  await expect(comparisonExplanation).not.toBeVisible();
 
+  await expect(method.locator(':scope > summary')).toHaveText(
+    'Bestimmung des Peak-Endes anzeigen',
+  );
   await method.locator(':scope > summary').click();
   expect(await method.evaluate((element) => element.open)).toBe(true);
-  await expect(method.locator('p')).toContainText('Mahlzeiten-Peak');
+  await expect(method.locator('p')).toContainText('stabil bestätigten Rückgang');
+  await expect(method.locator('p')).toContainText('20 Minuten');
+  await expect(method.locator('p')).toContainText('8 mg/dl');
+  await expect(method.locator('p')).not.toContainText('Rückgangs-Proxy');
   await method.locator(':scope > summary').click();
   expect(await method.evaluate((element) => element.open)).toBe(false);
-
-  await comparisonExplanation.locator(':scope > summary').click();
-  expect(await comparisonExplanation.evaluate((element) => element.open)).toBe(true);
-  await expect(comparisonExplanation.locator('#food-comparison-note')).toContainText('Mediane');
 
   const means = page.locator('#food-comparison-means');
   await expect(means.locator('h3')).toHaveText('Arithmetische Mittelwerte der Einzelangaben');
@@ -146,13 +147,13 @@ test('meal explanations are collapsed and food comparisons show arithmetic means
     '2 von 2 Einträgen vollständig auswertbar',
   );
   await expect(card.locator('[data-meal-mean="rise"] strong')).toHaveText(
-    'Ø 12,5 min nach Essen · n=2',
+    'Ø 12,5 min nach Essen',
   );
   await expect(card.locator('[data-meal-mean="peak"] strong')).toHaveText(
-    'Ø 165 mg/dl · 42,5 min nach Mahlzeitenbolus · 45 min nach Essen · n=2',
+    'Ø 165 mg/dl · 42,5 min nach Mahlzeitenbolus · 45 min nach Essen',
   );
   await expect(card.locator('[data-meal-mean="turn"] strong')).toHaveText(
-    'Ø 42,5 min nach Mahlzeitenbolus · 45 min nach Essen · n=2',
+    'Ø 42,5 min nach Mahlzeitenbolus · 45 min nach Essen',
   );
 
   expect(browserErrors).toEqual([]);

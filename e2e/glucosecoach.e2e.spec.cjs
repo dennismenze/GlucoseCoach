@@ -107,10 +107,18 @@ function expectedTurnText(analysis) {
   return `${mins(analysis.turnFromBolus)} nach Mahlzeitenbolus · ${mins(analysis.turnFromMeal)} nach Essen`;
 }
 
+function normalizeDiaryEntriesForStructuredUi(entries) {
+  return entries.map((entry) => ({
+    ...entry,
+    activity: '',
+    sleep: '',
+  }));
+}
+
 async function addDiaryEntriesThroughUi(page, entries) {
   for (const entry of entries) {
-    entry.sleep = String(Math.round(Number(entry.sleep) * 4) / 4);
     await clickTab(page, 'diary');
+    await page.locator('#entry-type').selectOption('meal');
     await page.locator('#when').fill(entry.when);
     await page.locator('#occasion').selectOption({ label: entry.occasion });
     await page.locator('#food').fill(entry.food);
@@ -118,8 +126,11 @@ async function addDiaryEntriesThroughUi(page, entries) {
     await page.locator('#fat').fill(entry.fat);
     await page.locator('#protein').fill(entry.protein);
     await page.locator('#fiber').fill(entry.fiber);
-    await page.locator('#activity').fill(entry.activity);
-    await page.locator('#sleep').fill(entry.sleep);
+
+    const context = page.locator('#diary-context-fields');
+    if (!await context.evaluate((element) => element.open)) {
+      await context.locator(':scope > summary').click();
+    }
     await page.locator('#stress').fill(entry.stress);
     await page.locator('#illness').selectOption(entry.illness);
     await page.locator('#notes').fill(entry.notes);
@@ -248,7 +259,7 @@ async function assertMealAnalysis(page, fixture) {
     await expectGridValue(item, 'Peak nach Mahlzeitenbolus', expectedPeakText(expected));
     await expectGridValue(item, '2-h-Wert', mg(expected.twoHour));
     await expectGridValue(item, 'maßgeblicher Mahlzeitenbolus', expectedBolusText(expected));
-    await expectGridValue(item, 'CGM-Wendepunkt-Proxy', expectedTurnText(expected));
+    await expectGridValue(item, 'Stabil bestätigter Rückgang', expectedTurnText(expected));
   }
 
   const tableRows = page.locator('#food-comparison tr');
@@ -333,6 +344,7 @@ async function assertQuality(page, fixture) {
 }
 
 async function runScenario(page, fixture) {
+  fixture.diary = normalizeDiaryEntriesForStructuredUi(fixture.diary);
   const consoleErrors = [];
   const pageErrors = [];
   page.on('console', (message) => {

@@ -47,6 +47,7 @@ jobs:
             docs/app-insulin-summary-ui.js \
             docs/app-all-bolus-phases.js \
             docs/app-compact-lists.js \
+            docs/app-feedback-ui.js \
             docs/version.js \
             docs/app-version.js; do
             test -s "$file"
@@ -73,6 +74,7 @@ jobs:
               "docs/app-insulin-summary-ui.js",
               "docs/app-all-bolus-phases.js",
               "docs/app-compact-lists.js",
+              "docs/app-feedback-ui.js",
               "docs/version.js",
               "docs/app-version.js",
           )
@@ -100,8 +102,12 @@ jobs:
               "app-export-ui.js",
               "app-all-bolus-phases.js",
               "app-compact-lists.js",
+              "app-feedback-ui.js",
               "version.js",
               "app-version.js",
+              "glucosecoach-food-library-v1",
+              "Boluszeitpunkt bei wiederholten Mahlzeiten",
+              "Abendlicher Anstieg ohne protokollierte Mahlzeit",
               "glucosecoach-csv-v1",
               "glucosecoach-omnipod-zip-v1",
               "ZIP64-Größenangaben",
@@ -166,7 +172,7 @@ jobs:
           ]
           if redundant:
               raise SystemExit(f"Redundant export contract returned: {redundant}")
-          print("Personal-local meal, all-bolus, ZIP/CSV, compact-list and version site verified")
+          print("Personal-local meal, all-bolus, ZIP/CSV, compact-list, feedback and version site verified")
           PY
 
       - name: Syntax-check browser and E2E modules
@@ -185,12 +191,14 @@ jobs:
           node --check docs/app-insulin-summary-core.js
           node --check docs/app-insulin-summary-ui.js
           node --check docs/app-compact-lists.js
+          node --check docs/app-feedback-ui.js
           node --check docs/app-version.js
           node --check tests/sites_logic_test.cjs
           node --check tests/postprandial_peak_test.cjs
           node --check tests/insulin_action_test.cjs
           node --check tests/all_bolus_phases_test.cjs
           node --check tests/meal_overlap_fallback_test.cjs
+          node --check tests/feedback_analysis_test.cjs
           node --check tests/zip_exchange_test.cjs
           node --check tests/zip64_fixture.cjs
           node --check tests/zip64_compat_test.cjs
@@ -203,11 +211,13 @@ jobs:
           node --check e2e/complete-export.e2e.spec.cjs
           node --check e2e/insulin-summary-ui.e2e.spec.cjs
           node --check e2e/compact-version.e2e.spec.cjs
+          node --check e2e/feedback-ui.e2e.spec.cjs
           node --check e2e/zip64-import.e2e.spec.cjs
           node --check e2e/all-bolus-phases-meal-overlap.e2e.spec.cjs
           node --check e2e/run-playwright.cjs
           node --check playwright.config.cjs
           python -m py_compile scripts/stamp_site_version.py
+          python -m py_compile tests/test_feedback_analysis.py
 
       - name: Run repository validator
         shell: bash
