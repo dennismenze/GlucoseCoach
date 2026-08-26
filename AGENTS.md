@@ -122,6 +122,12 @@ Wenn ein neuer Test einen Fehler findet, zuerst klassifizieren:
 
 Assertions dürfen nicht bloß gelockert oder entfernt werden, um CI grün zu bekommen. Bei einem Widerspruch zwischen Test und Produktverhalten muss geklärt werden, welches Verhalten fachlich beabsichtigt ist.
 
+## PRs ohne weitere Aufforderung mergen
+
+Sobald alle für den aktuellen PR vorgeschriebenen GitHub-Actions erfolgreich sind und kein tatsächlicher Merge-Blocker besteht, muss der Agent den PR selbstständig nach `main` mergen. Die Aufforderung zur Umsetzung schließt die Aufforderung zum Merge ein; eine gesonderte Bestätigung des Nutzers darf weder verlangt noch abgewartet werden.
+
+Die Arbeit darf nicht mit „PR ist bereit“, „PR ist noch nicht gemergt“ oder einer bloßen Merge-Empfehlung beendet werden. Nur fehlende Berechtigungen, Merge-Konflikte, Branch-Protection oder nicht erfolgreiche Pflichtprüfungen rechtfertigen ein ausbleibendes Merge. Solche Blocker sind soweit möglich selbstständig zu beheben und andernfalls konkret zu benennen.
+
 ## Abschlusskriterium
 
 Eine browserrelevante Aufgabe ist erst abgeschlossen, wenn der aktuelle PR-Head nach den letzten Änderungen einen erfolgreichen `Browser E2E`-Lauf hat und die übrigen Repository-Prüfungen ebenfalls grün sind. Im Abschlussbericht sind nur tatsächlich beobachtete CI-Ergebnisse zu behaupten.
