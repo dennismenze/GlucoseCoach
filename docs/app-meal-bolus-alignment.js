@@ -1,9 +1,8 @@
 (function (root) {
   'use strict';
 
-  const MINUTE_MS = 60_000;
   const MIN_MEAL_RISE_EVENTS = 2;
-  const MIN_BOLUS_COUNTERACTION_EVENTS = 2;
+  const MIN_EARLY_EFFECT_EVENTS = 3;
   const MAX_ABSOLUTE_OFFSET_MINUTES = 60;
 
   const TIMING_BUCKETS = [
@@ -93,19 +92,19 @@
     return `${Math.abs(lower)} Min. vorher bis ${upper} Min. danach`;
   }
 
-  function aggregateBolusCounteraction(bolusPhases) {
-    const aggregate = bolusPhases?.aggregate || bolusPhases || {};
-    const slowdown = aggregate?.slowdown || {};
-    const n = finite(slowdown.n) || 0;
-    const medianValue = finite(slowdown.median);
-    const q1 = finite(slowdown.q1);
-    const q3 = finite(slowdown.q3);
+  function aggregateEarlyEffect(earlyEffect) {
+    const aggregate = earlyEffect?.aggregate || earlyEffect || {};
+    const onset = aggregate?.onset || {};
+    const n = finite(onset.n) || 0;
+    const medianValue = finite(onset.median);
     return {
-      sufficient: n >= MIN_BOLUS_COUNTERACTION_EVENTS && medianValue !== null,
+      sufficient: aggregate.sufficient === true &&
+        n >= MIN_EARLY_EFFECT_EVENTS && medianValue !== null,
       n,
       median: medianValue === null ? null : round(medianValue, 0),
-      q1: q1 === null ? null : round(q1, 0),
-      q3: q3 === null ? null : round(q3, 0),
+      q1: finite(onset.q1) === null ? null : round(finite(onset.q1), 0),
+      q3: finite(onset.q3) === null ? null : round(finite(onset.q3), 0),
+      confidence: String(aggregate.confidence || 'nicht ausreichend'),
     };
   }
 
@@ -138,24 +137,22 @@
     };
   }
 
-  function confidenceForAlignment(rise, counteraction, observedConsistent) {
-    if (rise.n < MIN_MEAL_RISE_EVENTS || !counteraction.sufficient) return 'nicht ausreichend';
+  function confidenceForAlignment(rise, earlyEffect, observedConsistent) {
+    if (rise.n < MIN_MEAL_RISE_EVENTS || !earlyEffect.sufficient) return 'nicht ausreichend';
     let score = 0;
     if (rise.n >= 4) score += 1;
     if (rise.n >= 7) score += 1;
-    if (counteraction.n >= 4) score += 1;
-    if (counteraction.n >= 8) score += 1;
-    if (
-      Number.isFinite(counteraction.q1) && Number.isFinite(counteraction.q3) &&
-      counteraction.q3 - counteraction.q1 <= 20
-    ) score += 1;
+    if (earlyEffect.n >= 6) score += 1;
+    if (earlyEffect.n >= 12) score += 1;
+    if (earlyEffect.confidence === 'mittel') score += 1;
+    if (earlyEffect.confidence === 'hoch') score += 2;
     if (observedConsistent) score += 1;
-    if (score >= 5) return 'hoch';
+    if (score >= 6) return 'hoch';
     if (score >= 3) return 'mittel';
     return 'niedrig';
   }
 
-  function buildMealBolusAlignmentInsights(analyses = [], bolusPhases = null) {
+  function buildMealBolusAlignmentInsights(analyses = [], earlyEffectAnalysis = null) {
     const groups = new Map();
     for (const analysis of analyses || []) {
       const label = String(analysis?.entry?.food ?? '').trim();
@@ -174,7 +171,7 @@
       });
     }
 
-    const counteraction = aggregateBolusCounteraction(bolusPhases);
+    const earlyEffect = aggregateEarlyEffect(earlyEffectAnalysis);
     return [...groups.values()]
       .filter((group) => group.events.length >= 2)
       .map((group) => {
@@ -192,24 +189,24 @@
           available: false,
           reason: rise.n < MIN_MEAL_RISE_EVENTS
             ? 'too-few-rise-events'
-            : 'bolus-counteraction-unavailable',
+            : 'early-effect-unavailable',
           offsetMinutes: null,
           label: null,
           rangeLabel: null,
           rise,
-          counteraction,
+          earlyEffect,
           observedConsistent: false,
           confidence: 'nicht ausreichend',
         };
 
-        if (rise.n >= MIN_MEAL_RISE_EVENTS && counteraction.sufficient) {
-          const rawOffset = rise.median - counteraction.median;
+        if (rise.n >= MIN_MEAL_RISE_EVENTS && earlyEffect.sufficient) {
+          const rawOffset = rise.median - earlyEffect.median;
           if (Math.abs(rawOffset) <= MAX_ABSOLUTE_OFFSET_MINUTES) {
-            const lower = Number.isFinite(rise.q1) && Number.isFinite(counteraction.q3)
-              ? rise.q1 - counteraction.q3
+            const lower = Number.isFinite(rise.q1) && Number.isFinite(earlyEffect.q3)
+              ? rise.q1 - earlyEffect.q3
               : rawOffset;
-            const upper = Number.isFinite(rise.q3) && Number.isFinite(counteraction.q1)
-              ? rise.q3 - counteraction.q1
+            const upper = Number.isFinite(rise.q3) && Number.isFinite(earlyEffect.q1)
+              ? rise.q3 - earlyEffect.q1
               : rawOffset;
             const targetBucket = timingBucket(rawOffset);
             const observedConsistent = Boolean(
@@ -224,10 +221,10 @@
               rangeUpperOffset: round(upper, 0),
               rangeLabel: formatBolusTimingRange(lower, upper),
               rise,
-              counteraction,
+              earlyEffect,
               targetBucket: targetBucket?.key || null,
               observedConsistent,
-              confidence: confidenceForAlignment(rise, counteraction, observedConsistent),
+              confidence: confidenceForAlignment(rise, earlyEffect, observedConsistent),
             };
           } else {
             alignment.reason = 'outside-analysis-window';
@@ -290,18 +287,18 @@
 
   function formulaText(alignment) {
     const rise = alignment.rise.median;
-    const counteraction = alignment.counteraction.median;
+    const onset = alignment.earlyEffect.median;
     const offset = alignment.offsetMinutes;
     if (offset < 0) {
-      return `${formatNumber(counteraction, 0)} Min. bis zur beobachtbaren Gegenwirkung minus ` +
-        `${formatNumber(rise, 0)} Min. bis zum typischen Mahlzeitenanstieg ergeben ` +
-        `${formatNumber(Math.abs(offset), 0)} Min. Vorlauf.`;
+      return `${formatNumber(onset, 0)} Min. bis zur ersten anhaltenden trendbereinigten ` +
+        `CGM-Senkung minus ${formatNumber(rise, 0)} Min. bis zum typischen Mahlzeitenanstieg ` +
+        `ergeben ${formatNumber(Math.abs(offset), 0)} Min. Vorlauf.`;
     }
     if (offset > 0) {
-      return `Der typische Mahlzeitenanstieg beginnt ${formatNumber(rise - counteraction, 0)} Min. ` +
-        'später als die beobachtbare Gegenwirkung; daraus ergibt sich der Zeitpunkt nach Essensbeginn.';
+      return `Der typische Mahlzeitenanstieg beginnt ${formatNumber(rise - onset, 0)} Min. ` +
+        'später als die erste anhaltende trendbereinigte CGM-Senkung.';
     }
-    return 'Typischer Mahlzeitenanstieg und beobachtbare Gegenwirkung haben denselben Zeitabstand.';
+    return 'Typischer Mahlzeitenanstieg und erste anhaltende trendbereinigte CGM-Senkung haben denselben Zeitabstand.';
   }
 
   function renderAlignmentInsight(insight) {
@@ -311,10 +308,11 @@
       if (alignment.reason === 'too-few-rise-events') {
         missing += ` Der Beginn des Glukoseanstiegs ist erst in ${alignment.rise.n} ` +
           'geeigneten Verlauf/Verläufen bestimmbar; benötigt werden mindestens zwei.';
-      } else if (alignment.reason === 'bolus-counteraction-unavailable') {
-        missing += ` In den vorhandenen Bolusverläufen ist ein bereits laufender CGM-Anstieg erst ` +
-          `in ${alignment.counteraction.n} Verlauf/Verläufen nach der Insulinabgabe klar schwächer ` +
-          'geworden; benötigt werden mindestens zwei. Eine fünfstündige Isolation ist dafür nicht erforderlich.';
+      } else if (alignment.reason === 'early-effect-unavailable') {
+        missing += ` Die frühe trendbereinigte CGM-Gegenwirkung ist erst in ` +
+          `${alignment.earlyEffect.n} geeignetem/geeigneten Korrekturverlauf/-verläufen ` +
+          `bestimmbar; benötigt werden mindestens ${MIN_EARLY_EFFECT_EVENTS}. ` +
+          'Dafür wird nur das kurze Fenster bis 75 Minuten nach dem Bolus betrachtet, nicht die vollständige 5-h-Wirkdauer.';
       } else {
         missing += ' Das rechnerische Ergebnis liegt außerhalb des analysierten ' +
           'Bolusfensters von 60 Minuten vor bis 60 Minuten nach Essensbeginn.';
@@ -339,11 +337,11 @@
       `${escapeHtml(alignment.label)}.</strong></p>` +
       `<p class="meal-bolus-explanation">Bei dieser Mahlzeit beginnt der Glukoseanstieg ` +
       `typischerweise nach ${formatNumber(alignment.rise.median, 0)} Min. ` +
-      `(n=${alignment.rise.n}). In ${alignment.counteraction.n} auswertbaren Bolusverläufen mit zunächst klar ` +
-      `ansteigender CGM-Kurve wurde der Anstieg nach ` +
-      `${formatNumber(alignment.counteraction.median, 0)} Min. deutlich schwächer. Wenn der ` +
+      `(n=${alignment.rise.n}). In ${alignment.earlyEffect.n} kurzen, geeigneten ` +
+      `Korrekturverläufen lag die erste über mehrere CGM-Werte bestätigte Abweichung unter dem ` +
+      `vorherigen Trend nach ${formatNumber(alignment.earlyEffect.median, 0)} Min. Wenn der ` +
       `Mahlzeitenbolus bei dieser Mahlzeit ${escapeHtml(alignment.label)} abgegeben wird, fällt ` +
-      `diese erste beobachtbare Gegenwirkung rechnerisch ungefähr mit dem Beginn des ` +
+      `dieser früheste erkennbare Nettoeffekt rechnerisch ungefähr mit dem Beginn des ` +
       `Mahlzeitenanstiegs zusammen.</p>` +
       `<p class="meal-bolus-meta">${escapeHtml(formulaText(alignment))} ` +
       `Schätzbereich: ${escapeHtml(alignment.rangeLabel || alignment.label)} · ` +
@@ -378,9 +376,6 @@
     const card = ensureTimingCard();
     const target = card?.querySelector('#meal-timing-insights');
     if (!card || !target) return;
-    const title = card.querySelector('h2');
-    if (title) title.textContent = 'Geschätzter Mahlzeitenbolus-Vorlauf';
-
     const clinical = gcState.clinical && typeof gcState.clinical === 'object'
       ? gcState.clinical
       : {};
@@ -388,15 +383,15 @@
     const analyzeMealsFunction = typeof analyzeMeals === 'function'
       ? analyzeMeals
       : root?.GlucoseCoachV3?.analyzeMeals;
-    const analyzeBolusPhasesFunction = root?.GlucoseCoachV3?.analyzeAllBolusPhases ||
-      root?.GlucoseCoachAllBolusPhases?.analyzeAllBolusPhases;
+    const analyzeEarlyEffectFunction = root?.GlucoseCoachV3?.analyzeEarlyBolusEffect ||
+      root?.GlucoseCoachEarlyBolusEffect?.analyzeEarlyBolusEffect;
     if (typeof analyzeMealsFunction !== 'function') return;
 
     const analyses = analyzeMealsFunction(diary, clinical.cgm || [], clinical.boluses || []);
-    const bolusPhases = typeof analyzeBolusPhasesFunction === 'function'
-      ? analyzeBolusPhasesFunction(clinical)
+    const earlyEffect = typeof analyzeEarlyEffectFunction === 'function'
+      ? analyzeEarlyEffectFunction(clinical, diary)
       : null;
-    const insights = buildMealBolusAlignmentInsights(analyses, bolusPhases);
+    const insights = buildMealBolusAlignmentInsights(analyses, earlyEffect);
     if (!insights.length) {
       target.innerHTML = '<p class="muted">Noch keine Mahlzeit ist oft genug mit erkennbarem ' +
         'Glukoseanstieg und zugeordnetem Mahlzeitenbolus auswertbar.</p>';
@@ -404,14 +399,14 @@
     }
     target.innerHTML = insights.map(renderAlignmentInsight).join('') +
       '<details class="feedback-cause-details"><summary>Grenzen der Schätzung anzeigen</summary>' +
-      '<p>Der Vorlauf verbindet zwei persönliche CGM-Beobachtungen: den typischen Beginn des ' +
-      'Anstiegs bei dieser Mahlzeit und den Zeitabstand, nach dem ein bereits laufender Anstieg ' +
-      'in auswertbaren Verläufen nach einem positiven Bolus deutlich schwächer wurde. Dafür ist ' +
-      'keine fünfstündige Isolation erforderlich; die frühe Auswertung endet beim nächsten Bolus ' +
-      'oder spätestens nach drei Stunden. Das Abflachen kann außer durch Insulin auch durch ' +
-      'Nahrungsverlauf, Basalabgabe, Aktivität, Krankheit, Gegenregulation und Sensorverzögerung ' +
-      'beeinflusst sein. Die Zahl ist eine retrospektive Schätzung, keine automatische Änderung ' +
-      'von Dosis oder Pumpeneinstellung.</p></details>';
+      '<p>Der Vorlauf verbindet den typischen CGM-Anstiegsbeginn dieser Mahlzeit mit der frühen ' +
+      'trendbereinigten CGM-Gegenwirkung aus kurzen Korrekturverläufen. Diese frühe Analyse ' +
+      'betrachtet nur 30 Minuten vor bis 75 Minuten nach dem Bolus und verlangt keinen über fünf ' +
+      'Stunden vollständig isolierten Verlauf. Sie erkennt einen Nettoeffekt in der CGM-Kurve, ' +
+      'keinen pharmakologisch exakt gemessenen Wirkeintritt. Mahlzeitenverlauf, Basalabgabe, ' +
+      'Aktivität, Krankheit, Gegenregulation und Sensorverzögerung bleiben mögliche Mitursachen. ' +
+      'Die Zahl ist eine retrospektive Schätzung, keine automatische Änderung von Dosis oder ' +
+      'Pumpeneinstellung.</p></details>';
   }
 
   function installBrowserPatch() {
@@ -432,14 +427,14 @@
 
   const api = {
     buildMealBolusAlignmentInsights,
-    aggregateBolusCounteraction,
+    aggregateEarlyEffect,
     formatBolusTiming,
     formatBolusTimingRange,
     timingBucket,
     renderAlignmentInsight,
     renderMealBolusAlignment,
     MIN_MEAL_RISE_EVENTS,
-    MIN_BOLUS_COUNTERACTION_EVENTS,
+    MIN_EARLY_EFFECT_EVENTS,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
