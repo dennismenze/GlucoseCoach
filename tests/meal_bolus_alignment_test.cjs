@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const {
   buildMealBolusAlignmentInsights,
-  aggregateBolusCounteraction,
+  aggregateEarlyEffect,
   formatBolusTiming,
   formatBolusTimingRange,
   renderAlignmentInsight,
@@ -54,60 +54,64 @@ const analyses = [
   },
 ];
 
-const bolusPhases = {
+const earlyEffect = {
   aggregate: {
-    slowdown: { n: 7, mean: 26, median: 25, q1: 22, q3: 28 },
+    sufficient: true,
+    confidence: 'hoch',
+    onset: { n: 33, median: 24, q1: 18, q3: 36 },
   },
 };
 
-const insights = buildMealBolusAlignmentInsights(analyses, bolusPhases);
+const insights = buildMealBolusAlignmentInsights(analyses, earlyEffect);
 assert.equal(insights.length, 1);
 assert.equal(insights[0].label, 'Käsespätzle');
 assert.equal(insights[0].alignment.available, true);
 assert.equal(insights[0].alignment.rise.median, 11);
-assert.equal(insights[0].alignment.counteraction.median, 25);
-assert.equal(insights[0].alignment.offsetMinutes, -14);
-assert.equal(insights[0].alignment.label, '14 Min. vor dem Essen');
+assert.equal(insights[0].alignment.earlyEffect.median, 24);
+assert.equal(insights[0].alignment.offsetMinutes, -13);
+assert.equal(insights[0].alignment.label, '13 Min. vor dem Essen');
 assert.equal(insights[0].alignment.observedConsistent, true);
 assert.equal(insights[0].best.key, 'before');
 assert.equal(insights[0].best.medianPeakDelta, 26);
 const rendered = renderAlignmentInsight(insights[0]);
 assert.match(
   rendered,
-  /Geschätzter Mahlzeitenbolus: 14 Min\. vor dem Essen\./,
+  /Geschätzter Mahlzeitenbolus: 13 Min\. vor dem Essen\./,
 );
-assert.match(rendered, /erste beobachtbare Gegenwirkung/);
-assert.doesNotMatch(rendered, /isolierte Korrektur/);
+assert.match(rendered, /früheste erkennbare Nettoeffekt/);
+assert.doesNotMatch(rendered, /spätere Abflachung|65 Min|isolierte Korrekturverläufe/);
 
-const insufficientCounteraction = buildMealBolusAlignmentInsights(analyses, {
+const insufficientEffect = buildMealBolusAlignmentInsights(analyses, {
   aggregate: {
-    slowdown: { n: 1, mean: 25, median: 25, q1: 25, q3: 25 },
+    sufficient: false,
+    confidence: 'nicht ausreichend',
+    onset: { n: 2, median: 24, q1: 20, q3: 28 },
   },
 });
-assert.equal(insufficientCounteraction[0].alignment.available, false);
-assert.equal(
-  insufficientCounteraction[0].alignment.reason,
-  'bolus-counteraction-unavailable',
-);
-const missingRendered = renderAlignmentInsight(insufficientCounteraction[0]);
-assert.match(missingRendered, /fünfstündige Isolation ist dafür nicht erforderlich/);
+assert.equal(insufficientEffect[0].alignment.available, false);
+assert.equal(insufficientEffect[0].alignment.reason, 'early-effect-unavailable');
+const insufficientRendered = renderAlignmentInsight(insufficientEffect[0]);
+assert.match(insufficientRendered, /bis 75 Minuten nach dem Bolus/);
+assert.doesNotMatch(insufficientRendered, /fünfstündige Isolation/);
 
-const parsedCounteraction = aggregateBolusCounteraction(bolusPhases);
-assert.deepEqual(parsedCounteraction, {
+const parsedEffect = aggregateEarlyEffect(earlyEffect);
+assert.deepEqual(parsedEffect, {
   sufficient: true,
-  n: 7,
-  median: 25,
-  q1: 22,
-  q3: 28,
+  n: 33,
+  median: 24,
+  q1: 18,
+  q3: 36,
+  confidence: 'hoch',
 });
 
-const strictCorrectionAggregateMustNotBeUsed = buildMealBolusAlignmentInsights(analyses, {
+const lateSlowdownMustNotBeUsed = buildMealBolusAlignmentInsights(analyses, {
   aggregate: {
     sufficient: true,
-    onset: { n: 12, median: 40, q1: 35, q3: 45 },
-    slowdown: { n: 4, median: 24, q1: 21, q3: 27 },
+    confidence: 'hoch',
+    onset: { n: 12, median: 24, q1: 18, q3: 36 },
+    slowdown: { n: 292, median: 65, q1: 45, q3: 84 },
   },
 });
-assert.equal(strictCorrectionAggregateMustNotBeUsed[0].alignment.offsetMinutes, -13);
+assert.equal(lateSlowdownMustNotBeUsed[0].alignment.offsetMinutes, -13);
 
 console.log('meal bolus alignment tests passed');

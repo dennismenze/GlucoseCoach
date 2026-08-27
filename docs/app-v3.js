@@ -9,6 +9,7 @@
       const mealBoundary = require('./app-meal-boundary.js');
       const insulinAction = require('./app-insulin-action.js');
       const allBolusPhases = require('./app-all-bolus-phases.js');
+      const earlyBolusEffect = require('./app-early-bolus-effect.js');
       const importers = require('./app-importers-context.js');
       const exportCore = require('./app-export-core.js');
       const zipExchange = require('./app-zip64-compat.js');
@@ -32,6 +33,7 @@
         ...zipExchange,
         ...insulinSummaryCore,
         ...allBolusPhases,
+        ...earlyBolusEffect,
         ...glookoMode,
         ...feedbackUi,
         ...feedbackGlooko,
@@ -92,9 +94,11 @@
                                           loadScript('app-glooko-mode.js', () =>
                                             loadScript('app-feedback-ui.js', () =>
                                               loadScript('app-feedback-glooko.js', () =>
-                                                loadScript('app-meal-bolus-alignment.js', () =>
-                                                  loadScript('app-feedback-polish.js', () =>
-                                                    loadScript('app-version.js'),
+                                                loadScript('app-early-bolus-effect.js', () =>
+                                                  loadScript('app-meal-bolus-alignment.js', () =>
+                                                    loadScript('app-feedback-polish.js', () =>
+                                                      loadScript('app-version.js'),
+                                                    ),
                                                   ),
                                                 ),
                                               ),

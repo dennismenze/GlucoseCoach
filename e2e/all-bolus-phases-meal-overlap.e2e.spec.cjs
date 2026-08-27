@@ -90,7 +90,7 @@ async function importFiles(page, cgm, boluses) {
   await expect(page.locator('#import-progress')).toContainText('Fertig:');
 }
 
-test('all positive boluses keep their numeric phase contract after the UI cleanup', async ({ page }) => {
+test('early counteraction and later phases keep their numeric contract', async ({ page }) => {
   const first = minute('2026-08-01T08:00:00+02:00');
   const second = minute('2026-08-02T08:00:00+02:00');
   const cgm = [...phaseCurve(first), ...phaseCurve(second, 10, 5)];
@@ -105,24 +105,29 @@ test('all positive boluses keep their numeric phase contract after the UI cleanu
 
   const card = page.locator('#all-bolus-phases-card');
   await expect(card).toBeVisible();
-  await expect(card.locator('h2')).toHaveText('Beobachtete Kurvenänderung nach Boli');
+  await expect(card.locator('h2')).toHaveText(
+    'Frühe Gegenwirkung und spätere CGM-Kurvenphasen',
+  );
 
   const visibleSummary = card.locator('#all-bolus-phase-summary > div:not([hidden])');
   await expect(visibleSummary.locator('span')).toHaveText([
     'positive Boli geprüft',
     'mit ausreichendem CGM-Fenster',
-    'Anstieg wird schwächer',
-    'Wendepunkt',
+    'frühe trendbereinigte Gegenwirkung',
+    'spätere Abflachung des Netto-Anstiegs',
+    'späterer Wendepunkt',
     'stabiler Rückgang beginnt',
   ]);
   await expect(visibleSummary.locator('strong')).toHaveText([
     '2',
     '2',
-    'Ø 55 min',
-    'Ø 75 min',
-    'Ø 90 min',
+    'zu wenige geeignete Verläufe (0)',
+    'Ø 55 min · 2 Verläufe',
+    'Ø 75 min · 2 Verläufe',
+    'Ø 90 min · 2 Verläufe',
   ]);
 
+  await expect(page.getByText('Anstieg wird schwächer', { exact: true })).not.toBeVisible();
   const removedCompleteCount = card.locator('#all-bolus-phase-summary > div')
     .filter({ hasText: 'vollständige Drei-Phasen-Verläufe' });
   await expect(removedCompleteCount).not.toBeVisible();
