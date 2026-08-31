@@ -60,8 +60,6 @@
       GlucoseCoachV3.analyzeMealAdaptivePeak = analyzeMealWithConsistentTiming;
       GlucoseCoachV3.analyzeMealTwoHourPeak = analyzeMealWithConsistentTiming;
     }
-
-    gcRender();
   }
 
   const api = {
