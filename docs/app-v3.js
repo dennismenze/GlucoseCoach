@@ -23,6 +23,7 @@
       const carbOnlyMealsCompat = require('./app-carb-only-meals-compat.js');
       const carbOnlyMealsFinal = require('./app-carb-only-meals-final.js');
       const carbOnlyMealTiming = require('./app-carb-only-meals-timing.js');
+      const carbOnlyMealAssociation = require('./app-carb-only-meals-association.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -47,6 +48,7 @@
         ...carbOnlyMealsCompat,
         ...carbOnlyMealsFinal,
         ...carbOnlyMealTiming,
+        ...carbOnlyMealAssociation,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
@@ -54,6 +56,7 @@
         analyzeMealAdaptivePeak: carbOnlyMealTiming.analyzeMealAdaptivePeak,
         analyzeMealTwoHourPeak: carbOnlyMealTiming.analyzeMealTwoHourPeak,
         buildFoodComparisons: carbOnlyMeals.buildFoodComparisons,
+        augmentMealDiary: carbOnlyMealAssociation.augmentMealDiary,
       };
     }
     return;
@@ -110,7 +113,9 @@
                                                         loadScript('app-carb-only-meals-compat.js', () =>
                                                           loadScript('app-carb-only-meals-final.js', () =>
                                                             loadScript('app-carb-only-meals-timing.js', () =>
-                                                              loadScript('app-version.js'),
+                                                              loadScript('app-carb-only-meals-association.js', () =>
+                                                                loadScript('app-version.js'),
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
