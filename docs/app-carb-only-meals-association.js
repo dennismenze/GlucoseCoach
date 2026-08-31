@@ -9,6 +9,9 @@
   const carbApi = isNode
     ? require('./app-carb-only-meals.js')
     : root?.GlucoseCoachCarbOnlyMeals;
+  const finalApi = isNode
+    ? require('./app-carb-only-meals-final.js')
+    : root?.GlucoseCoachCarbOnlyMealsFinal;
 
   function array(value) {
     return Array.isArray(value) ? value : [];
@@ -56,10 +59,36 @@
     return 'Snack';
   }
 
+  function nearestMeal(records, minute) {
+    let best = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const record of records) {
+      if (!Number.isFinite(record.minute)) continue;
+      const distance = Math.abs(record.minute - minute);
+      if (distance < bestDistance) {
+        best = record;
+        bestDistance = distance;
+      }
+    }
+    return best ? { ...best, distance: bestDistance } : null;
+  }
+
   function augmentMealDiary(diary, boluses) {
-    const meals = array(diary)
+    const sourceMeals = array(diary)
       .filter((entry) => MEALS.has(entry?.occasion))
       .map((entry) => ({ ...entry }));
+
+    // The per-meal analyzer invokes this helper with one already complete entry.
+    // Returning immediately avoids rebuilding all synthetic Glooko meals hundreds
+    // of times during one browser render.
+    if (sourceMeals.length === 1 && number(sourceMeals[0]?.carbs) > 0) {
+      return sourceMeals;
+    }
+
+    const mealRecords = sourceMeals.map((entry) => ({
+      entry,
+      minute: parseTime(entry.when),
+    }));
     const seen = new Set();
     const carbohydrateRows = array(boluses)
       .filter((row) => number(row?.[0]) !== null && number(row?.[1]) > 0)
@@ -76,17 +105,14 @@
       const matchRadius = number(row?.[2]) > 0
         ? MEAL_BOLUS_MATCH_MINUTES
         : LOCAL_CARB_MATCH_MINUTES;
-      const match = meals
-        .map((entry) => ({ entry, minute: parseTime(entry.when) }))
-        .filter((item) => Number.isFinite(item.minute))
-        .sort((a, b) => Math.abs(a.minute - minute) - Math.abs(b.minute - minute))[0];
+      const match = nearestMeal(mealRecords, minute);
 
-      if (match && Math.abs(match.minute - minute) <= matchRadius) {
+      if (match && match.distance <= matchRadius) {
         if (!(number(match.entry.carbs) > 0)) match.entry.carbs = String(number(row[1]));
         continue;
       }
 
-      meals.push({
+      const entry = {
         id: `glooko-carbs-${minute}`,
         when: localDateTime(minute),
         occasion: occasion(minute),
@@ -102,10 +128,12 @@
         notes: 'Aus positiver Kohlenhydratangabe im Glooko-Export übernommen',
         source: 'glooko',
         readOnly: true,
-      });
+      };
+      sourceMeals.push(entry);
+      mealRecords.push({ entry, minute });
     }
 
-    return meals.filter((entry) => number(entry?.carbs) > 0);
+    return sourceMeals.filter((entry) => number(entry?.carbs) > 0);
   }
 
   function install() {
@@ -114,11 +142,15 @@
     if (typeof GlucoseCoachV3 !== 'undefined') {
       GlucoseCoachV3.augmentMealDiary = augmentMealDiary;
     }
+    if (typeof finalApi?.clearAnalysisCache === 'function') {
+      finalApi.clearAnalysisCache();
+    }
     if (!isNode && typeof gcRender === 'function') gcRender();
   }
 
   const api = {
     augmentMealDiary,
+    nearestMeal,
     GC_LOCAL_CARB_MATCH_MINUTES: LOCAL_CARB_MATCH_MINUTES,
     GC_MEAL_BOLUS_MATCH_MINUTES: MEAL_BOLUS_MATCH_MINUTES,
   };
