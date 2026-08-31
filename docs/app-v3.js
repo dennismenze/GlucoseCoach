@@ -20,6 +20,7 @@
       const mealBolusAlignment = require('./app-meal-bolus-alignment.js');
       const feedbackPolish = require('./app-feedback-polish.js');
       const carbOnlyMeals = require('./app-carb-only-meals.js');
+      const carbOnlyMealsCompat = require('./app-carb-only-meals-compat.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -41,11 +42,13 @@
         ...mealBolusAlignment,
         ...feedbackPolish,
         ...carbOnlyMeals,
+        ...carbOnlyMealsCompat,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
         analyzeMeals: carbOnlyMeals.analyzeMeals,
-        analyzeMealAdaptivePeak: carbOnlyMeals.analyzeMealAdaptivePeak,
+        analyzeMealAdaptivePeak: carbOnlyMealsCompat.analyzeMealAdaptivePeak,
+        analyzeMealTwoHourPeak: carbOnlyMealsCompat.analyzeMealTwoHourPeak,
         buildFoodComparisons: carbOnlyMeals.buildFoodComparisons,
       };
     }
@@ -100,7 +103,9 @@
                                                   loadScript('app-meal-bolus-alignment.js', () =>
                                                     loadScript('app-feedback-polish.js', () =>
                                                       loadScript('app-carb-only-meals.js', () =>
-                                                        loadScript('app-version.js'),
+                                                        loadScript('app-carb-only-meals-compat.js', () =>
+                                                          loadScript('app-version.js'),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
