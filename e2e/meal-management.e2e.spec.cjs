@@ -40,7 +40,7 @@ function collectBrowserErrors(page) {
   return errors;
 }
 
-test('local meals with variant names can be merged and persist as one comparison group', async ({ page }) => {
+test('local meals with variant names can be merged while unusable comparisons stay hidden', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
   const diary = [
     diaryEntry(
@@ -103,13 +103,15 @@ test('local meals with variant names can be merged and persist as one comparison
 
   await clickTab(page, 'meal-analysis');
   const comparison = page.locator('#food-comparison tr').filter({ hasText: canonical });
-  await expect(comparison).toHaveCount(1);
-  await expect(comparison.locator('td').nth(1)).toHaveText('2');
-  await expect(comparison.locator('td').nth(2)).toHaveText('0');
+  await expect(comparison).toHaveCount(0);
+  await expect(page.locator('#meal-events .analysis-item')).toHaveCount(0);
+  await expect(page.locator('#meal-events')).toContainText(
+    'Keine Mahlzeit mit positiven Kohlenhydraten und vollständig auswertbarem CGM-Verlauf',
+  );
   expect(browserErrors).toEqual([]);
 });
 
-test('a reliable window cut off before the turn is complete but has no final peak', async ({ page }) => {
+test('a censored window remains available internally but is omitted from the usable meal list', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
   const meal = minute('2026-08-05T08:00:00+02:00');
   const values = new Map([
@@ -138,42 +140,22 @@ test('a reliable window cut off before the turn is complete but has no final pea
   await clickTab(page, 'meal-analysis');
 
   const item = page.locator('#meal-events .analysis-item').filter({ hasText: 'Banane' });
-  await expect(item).toHaveCount(1);
-  await expect(item.locator('.status')).toHaveText(
-    'vollständig · Fenster vor Wendepunkt beendet',
-  );
-  await expect(item.locator('.status')).toHaveClass(/\bok\b/);
-  await expect(item).toHaveAttribute('data-analysis-status', 'complete-overlap-censored');
-
-  const peak = item.locator('.analysis-grid > div').filter({ hasText: 'Endgültiger Peak' });
-  await expect(peak.locator('strong')).toHaveText(
-    'nicht endgültig bestimmbar · kein stabiler Wendepunkt vor Folgebolus',
-  );
-
-  const substitute = item.locator('.analysis-grid > div').filter({ hasText: 'Ersatz für 2-h-Wert' });
-  await expect(substitute.locator('strong')).toHaveText(
-    '132 mg/dl · höchster Wert bis 91 min nach Essen',
-  );
-
-  const turn = item.locator('.analysis-grid > div').filter({
-    hasText: 'Stabil bestätigter Rückgang (nutzbares Fenster)',
-  });
-  await expect(turn.locator('strong')).toContainText(
-    'nutzbares Fenster endete 91 min nach Essen',
-  );
-  await expect(turn.locator('strong')).toContainText('2-h-Marke wurde nicht erreicht');
+  await expect(item).toHaveCount(0);
+  await expect(page.locator('#meal-summary strong')).toHaveText(['0', '0', '0', '0']);
 
   const analysis = await page.evaluate(() => {
-    const result = GlucoseCoachV3.analyzeMeals(
-      gcState.diary,
+    const result = GlucoseCoachV3.analyzeMealAdaptivePeak(
+      gcState.diary[0],
       gcState.clinical.cgm,
       gcState.clinical.boluses,
-    )[0];
+      null,
+    );
     return {
       complete: result.complete,
       peakComplete: result.peakComplete,
       comparisonEligible: result.comparisonEligible,
       status: result.status,
+      usableForMealAnalysis: result.usableForMealAnalysis,
     };
   });
   expect(analysis).toEqual({
@@ -181,6 +163,7 @@ test('a reliable window cut off before the turn is complete but has no final pea
     peakComplete: false,
     comparisonEligible: false,
     status: 'complete-overlap-censored',
+    usableForMealAnalysis: false,
   });
   expect(browserErrors).toEqual([]);
 });

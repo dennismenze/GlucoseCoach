@@ -7,7 +7,7 @@ async function clickTab(page, id) {
   await expect(page.locator(`#${id}`)).toHaveClass(/\bactive\b/);
 }
 
-test('meal analysis and diary remain compact while a traceable version is always visible', async ({ page }) => {
+test('meal analysis omits unusable entries while the diary stays compact and versioned', async ({ page }) => {
   const diary = [
     {
       id: 'meal-1',
@@ -80,14 +80,12 @@ test('meal analysis and diary remain compact while a traceable version is always
   await clickTab(page, 'meal-analysis');
   const mealDisclosure = page.locator('#meal-events-disclosure');
   await expect(mealDisclosure).toBeAttached();
-  expect(await mealDisclosure.evaluate((element) => element.open)).toBe(false);
-  await expect(page.locator('#meal-events > details.analysis-item')).toHaveCount(diary.length);
-  await mealDisclosure.locator(':scope > summary').click();
   expect(await mealDisclosure.evaluate((element) => element.open)).toBe(true);
-  const firstMeal = page.locator('#meal-events > details.analysis-item').first();
-  expect(await firstMeal.evaluate((element) => element.open)).toBe(false);
-  await firstMeal.locator(':scope > summary').click();
-  expect(await firstMeal.evaluate((element) => element.open)).toBe(true);
+  await expect(page.locator('#meal-events > details.analysis-item')).toHaveCount(0);
+  await expect(mealDisclosure.locator(':scope > summary')).toHaveText('Keine auswertbaren Mahlzeiten');
+  await expect(page.locator('#meal-events')).toContainText(
+    'Keine Mahlzeit mit positiven Kohlenhydraten und vollständig auswertbarem CGM-Verlauf',
+  );
 
   await clickTab(page, 'diary');
   const diaryDisclosure = page.locator('#diary-entries-disclosure');

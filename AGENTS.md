@@ -72,11 +72,13 @@ Für `Insulinwirkung` gilt zusätzlich:
 Für den Mahlzeiten-Peak müssen fokussierte Fixtures mindestens abdecken:
 
 - einen zugeordneten Mahlzeitenbolus im Bereich von ±60 Minuten um den Tagebucheintrag;
+- eine positive Kohlenhydratangabe ohne abgegebenes Mahlzeiteninsulin, die bei vollständig auswertbarem CGM-Verlauf ab Essensbeginn analysiert wird;
 - einen späteren Korrekturbolus während der noch steigenden Kurve;
 - einen weiteren Bolus nach dem eigentlichen Peak bzw. Wendepunkt;
 - den Nachweis, dass beide späteren Boli den Mahlzeitenbolus und den Peak-Start nicht ersetzen;
-- einen Bolus ohne positive Kohlenhydratangabe und mit beliebigem Typfeld, der keine vollständige Mahlzeitenanalyse erzeugen darf;
-- einen Bolus außerhalb des Zuordnungsfensters, der nicht rückwirkend als Mahlzeitenbolus verwendet werden darf.
+- einen positiven Bolus ohne positive Kohlenhydratangabe und mit beliebigem Typfeld, der immer Korrekturbolus bleibt und kein Mahlzeitenereignis erzeugt;
+- einen Bolus außerhalb des Zuordnungsfensters, der nicht rückwirkend als Mahlzeitenbolus verwendet werden darf;
+- Mahlzeiten ohne positiven KH-Wert oder ohne endgültig bestimmbaren Peak, die in Einzelliste, Gruppenvergleich und daraus abgeleiteten Empfehlungen nicht erscheinen.
 
 Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constraints wie `step`, `min` und `max` einzuhalten und CSV-Felder mit Trennzeichen korrekt zu quoten. Ein Test soll nicht wegen absichtlich oder versehentlich ungültiger Fixture-Daten fehlschlagen, außer genau diese Validierung wird getestet.
 
@@ -84,18 +86,22 @@ Testfixtures müssen gültige Eingaben darstellen. Insbesondere sind HTML-Constr
 
 Der Mahlzeiten-Peak ist **nicht** auf 120 Minuten begrenzt. Fett- und proteinreiche Mahlzeiten können einen deutlich späteren Glukoseanstieg zeigen; deshalb gilt für die Implementierung:
 
-- der Mahlzeitenkontext reicht bis zu 300 Minuten nach dem protokollierten Essensbeginn, endet aber früher bei einer neuen protokollierten Mahlzeit;
+- nur ein Mahlzeitenereignis mit positiver Kohlenhydratangabe ist für die Mahlzeitenanalyse berechtigt; die KH-Angabe darf aus dem lokalen Tagebuch oder einem zeitlich zugeordneten Importereignis stammen;
+- eine Insulinabgabe ist für die Mahlzeitenanalyse nicht erforderlich: Sind positive Kohlenhydrate, aber kein Mahlzeitenbolus vorhanden, beginnt das Peakfenster beim protokollierten Essensbeginn;
+- der Mahlzeitenkontext reicht bis zu 300 Minuten nach dem protokollierten Essensbeginn, endet aber früher bei einer neuen berechtigten Mahlzeit mit positiver Kohlenhydratangabe;
 - als Mahlzeitenbolus kommt nur ein positiver Bolus mit positiver Kohlenhydratangabe im Bereich von 60 Minuten vor bis 60 Minuten nach dem protokollierten Essensbeginn infrage;
 - bei mehreren solchen Kandidaten dürfen vorhandene Tagebuch-Kohlenhydrate zur plausiblen Zuordnung verwendet werden;
-- jeder positive Bolus ohne positive Kohlenhydratangabe ist immer ein Korrekturbolus, unabhängig davon, ob sein Typfeld `Bolus`, `Korrektur`, `Correction` oder etwas anderes enthält; er darf nie als Mahlzeitenbolus verwendet werden;
-- ausgehend vom zugeordneten Mahlzeitenbolus wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
-- der maßgebliche Peak ist der höchste CGM-Wert zwischen diesem Mahlzeitenbolus und dem anschließend stabil bestätigten Rückgang;
-- weitere Boli ohne positive Kohlenhydratangabe starten weder die Peak-Suche noch die Wendepunktsuche neu; Boli nach dem Mahlzeitenbolus und vor dem Wendepunkt werden als Korrekturboli ausgewiesen;
+- jeder positive Bolus ohne positive Kohlenhydratangabe ist immer ein Korrekturbolus, unabhängig davon, ob sein Typfeld `Bolus`, `Korrektur`, `Correction` oder etwas anderes enthält; er darf nie als Mahlzeitenbolus oder als eigenständiges Mahlzeitenereignis verwendet werden;
+- ist ein Mahlzeitenbolus vorhanden, beginnt das Peakfenster bei diesem Bolus; ohne Mahlzeitenbolus beginnt es beim Essensbeginn;
+- ausgehend von diesem Anker wird ein anhaltender Rückgangs-Proxy mit Hysterese bestimmt;
+- der maßgebliche Peak ist der höchste CGM-Wert zwischen dem jeweiligen Anker und dem anschließend stabil bestätigten Rückgang;
+- weitere Boli ohne positive Kohlenhydratangabe starten weder die Peak-Suche noch die Wendepunktsuche neu; sie werden als Korrekturboli ausgewiesen;
 - solche späteren Boli bleiben Störvariablen und können den beobachteten CGM-Verlauf beeinflussen; das Ignorieren als Peak-Anker bedeutet nicht, dass ihre Wirkung rechnerisch entfernt wurde;
 - der 2-h-Wert bleibt als separater Referenzwert erhalten, ist aber nicht die Peak-Grenze;
-- ohne zugeordneten Mahlzeitenbolus oder ohne stabil bestätigten Rückgang darf kein endgültiger bolusbezogener Mahlzeiten-Peak behauptet werden;
-- eine weitere protokollierte Mahlzeit beendet die Zuordnung und kann die vorherige Analyse unvollständig machen;
-- die UI muss Zeitabstände sowohl relativ zum Essen als auch relativ zum zugeordneten Mahlzeitenbolus eindeutig benennen.
+- ohne stabil bestätigten Rückgang und endgültig bestimmbaren Peak gilt eine Mahlzeit für die sichtbare Mahlzeitenanalyse als nicht nutzbar;
+- nicht nutzbare Mahlzeiten werden nicht in der Mahlzeiten-Einzelliste, in Lebensmittelvergleichen oder in daraus abgeleiteten Empfehlungen angezeigt; im Tagebuch und Rohdatenbestand bleiben sie unverändert erhalten;
+- eine weitere berechtigte Mahlzeit beendet die Zuordnung und kann die vorherige Analyse unvollständig machen;
+- bei vorhandenem Mahlzeitenbolus muss die UI Zeitabstände relativ zum Essen und zum Bolus eindeutig benennen; ohne Mahlzeitenbolus werden ausschließlich mahlzeitenbezogene Zeitabstände ausgegeben.
 
 Die Hysterese darf nicht durch einen einzelnen gleichen oder niedrigeren CGM-Wert ausgelöst werden. Der aktuelle Vertrag verlangt vier zusammenhängende Folgewerte über rund 20 Minuten, mindestens 8 mg/dl bestätigten Abfall und verwirft einen Kandidaten bei einem späteren Rebound von mehr als 3 mg/dl im verbleibenden Kontext.
 
@@ -127,6 +133,10 @@ Assertions dürfen nicht bloß gelockert oder entfernt werden, um CI grün zu be
 Sobald alle für den aktuellen PR vorgeschriebenen GitHub-Actions erfolgreich sind und kein tatsächlicher Merge-Blocker besteht, muss der Agent den PR selbstständig nach `main` mergen. Die Aufforderung zur Umsetzung schließt die Aufforderung zum Merge ein; eine gesonderte Bestätigung des Nutzers darf weder verlangt noch abgewartet werden.
 
 Die Arbeit darf nicht mit „PR ist bereit“, „PR ist noch nicht gemergt“ oder einer bloßen Merge-Empfehlung beendet werden. Nur fehlende Berechtigungen, Merge-Konflikte, Branch-Protection oder nicht erfolgreiche Pflichtprüfungen rechtfertigen ein ausbleibendes Merge. Solche Blocker sind soweit möglich selbstständig zu beheben und andernfalls konkret zu benennen.
+
+## Keine Zwischenmeldung vor Abschluss
+
+Während eines beauftragten GitHub-Arbeitsstrangs wird dem Nutzer kein unfertiger Zwischenstand gemeldet. Nach Beginn der Umsetzung wird ohne weitere Chatmeldung bis zu grünen Pflichtprüfungen und anschließendem Merge weitergearbeitet. Eine Meldung vor dem Merge ist nur zulässig, wenn ein nicht selbst behebbarer Berechtigungs-, Branch-Protection-, Merge- oder CI-Infrastrukturblocker die Fortsetzung tatsächlich verhindert; dann ist ausschließlich dieser konkrete Blocker zu benennen.
 
 ## Abschlusskriterium
 

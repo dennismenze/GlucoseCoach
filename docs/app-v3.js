@@ -19,6 +19,7 @@
       const feedbackGlooko = require('./app-feedback-glooko.js');
       const mealBolusAlignment = require('./app-meal-bolus-alignment.js');
       const feedbackPolish = require('./app-feedback-polish.js');
+      const carbOnlyMeals = require('./app-carb-only-meals.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -39,12 +40,13 @@
         ...feedbackGlooko,
         ...mealBolusAlignment,
         ...feedbackPolish,
+        ...carbOnlyMeals,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
-        analyzeMeals: mealBoundary.analyzeMeals,
-        analyzeMealAdaptivePeak: mealBoundary.analyzeMealAdaptivePeak,
-        buildFoodComparisons: mealBoundary.buildFoodComparisons,
+        analyzeMeals: carbOnlyMeals.analyzeMeals,
+        analyzeMealAdaptivePeak: carbOnlyMeals.analyzeMealAdaptivePeak,
+        buildFoodComparisons: carbOnlyMeals.buildFoodComparisons,
       };
     }
     return;
@@ -97,7 +99,9 @@
                                                 loadScript('app-early-bolus-effect.js', () =>
                                                   loadScript('app-meal-bolus-alignment.js', () =>
                                                     loadScript('app-feedback-polish.js', () =>
-                                                      loadScript('app-version.js'),
+                                                      loadScript('app-carb-only-meals.js', () =>
+                                                        loadScript('app-version.js'),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
