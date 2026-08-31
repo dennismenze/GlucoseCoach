@@ -83,67 +83,78 @@
     document.head.appendChild(script);
   }
 
-  loadScript('version.js', () =>
-    loadScript('app-v3-core.js', () =>
-      loadScript('app-importers.js', () =>
-        loadScript('app-importers-context.js', () =>
-          loadScript('app-ui-contract.js', () =>
-            loadScript('app-meal-window.js', () =>
-              loadScript('app-meal-overlap-fallback.js', () =>
-                loadScript('app-insulin-action.js', () =>
-                  loadScript('app-export-core.js', () =>
-                    loadScript('app-zip-core.js', () =>
-                      loadScript('app-zip64-compat.js', () =>
-                        loadScript('app-export-ui.js', () =>
-                          loadScript('app-insulin-summary-core.js', () =>
-                            loadScript('app-insulin-summary-ui.js', () =>
-                              loadScript('app-all-bolus-phases.js', () =>
-                                loadScript('app-compact-lists.js', () =>
-                                  loadScript('app-insulin-page-ui.js', () =>
-                                    loadScript('app-meal-page-ui.js', () =>
-                                      loadScript('app-meal-management.js', () =>
-                                        loadScript('app-meal-boundary.js', () =>
-                                          loadScript('app-glooko-mode.js', () =>
-                                            loadScript('app-feedback-ui.js', () =>
-                                              loadScript('app-feedback-glooko.js', () =>
-                                                loadScript('app-early-bolus-effect.js', () =>
-                                                  loadScript('app-meal-bolus-alignment.js', () =>
-                                                    loadScript('app-feedback-polish.js', () =>
-                                                      loadScript('app-carb-only-meals.js', () =>
-                                                        loadScript('app-carb-only-meals-compat.js', () =>
-                                                          loadScript('app-carb-only-meals-final.js', () =>
-                                                            loadScript('app-carb-only-meals-timing.js', () =>
-                                                              loadScript('app-carb-only-meals-association.js', () =>
-                                                                loadScript('app-version.js'),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
+  function prepareCarbOnlyInstall() {
+    // app-carb-only-meals.js historically rendered immediately while later
+    // compatibility patches were still loading. Suppress only that bootstrap
+    // render; the last association patch performs one complete render.
+    globalThis.__glucoseCoachCarbOnlyMealsInstalled = true;
+  }
+
+  function activateCarbOnlyApi() {
+    const api = globalThis.GlucoseCoachCarbOnlyMeals;
+    if (!api) return;
+    if (typeof analyzeMeals !== 'undefined') analyzeMeals = api.analyzeMeals;
+    if (typeof buildFoodComparisons !== 'undefined') {
+      buildFoodComparisons = api.buildFoodComparisons;
+    }
+    if (typeof buildRecommendations !== 'undefined') {
+      buildRecommendations = api.buildRecommendations;
+    }
+    if (typeof GlucoseCoachV3 !== 'undefined') {
+      Object.assign(GlucoseCoachV3, {
+        analyzeMealAdaptivePeak: api.analyzeMealAdaptivePeak,
+        analyzeMealTwoHourPeak: api.analyzeMealTwoHourPeak,
+        analyzeMeals: api.analyzeMeals,
+        buildFoodComparisons: api.buildFoodComparisons,
+        buildRecommendations: api.buildRecommendations,
+        augmentMealDiary: api.augmentMealDiary,
+      });
+    }
+  }
+
+  const scripts = [
+    'app-v3-core.js',
+    'app-importers.js',
+    'app-importers-context.js',
+    'app-ui-contract.js',
+    'app-meal-window.js',
+    'app-meal-overlap-fallback.js',
+    'app-insulin-action.js',
+    'app-export-core.js',
+    'app-zip-core.js',
+    'app-zip64-compat.js',
+    'app-export-ui.js',
+    'app-insulin-summary-core.js',
+    'app-insulin-summary-ui.js',
+    'app-all-bolus-phases.js',
+    'app-compact-lists.js',
+    'app-insulin-page-ui.js',
+    'app-meal-page-ui.js',
+    'app-meal-management.js',
+    'app-meal-boundary.js',
+    'app-glooko-mode.js',
+    'app-feedback-ui.js',
+    'app-feedback-glooko.js',
+    'app-early-bolus-effect.js',
+    'app-meal-bolus-alignment.js',
+    'app-feedback-polish.js',
+    'app-carb-only-meals.js',
+    'app-carb-only-meals-compat.js',
+    'app-carb-only-meals-final.js',
+    'app-carb-only-meals-timing.js',
+    'app-carb-only-meals-association.js',
+    'app-version.js',
+  ];
+
+  function loadNext(index) {
+    const src = scripts[index];
+    if (!src) return;
+    if (src === 'app-carb-only-meals.js') prepareCarbOnlyInstall();
+    loadScript(src, () => {
+      if (src === 'app-carb-only-meals.js') activateCarbOnlyApi();
+      loadNext(index + 1);
+    });
+  }
+
+  loadScript('version.js', () => loadNext(0));
 })();
