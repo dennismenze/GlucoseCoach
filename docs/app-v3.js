@@ -19,6 +19,11 @@
       const feedbackGlooko = require('./app-feedback-glooko.js');
       const mealBolusAlignment = require('./app-meal-bolus-alignment.js');
       const feedbackPolish = require('./app-feedback-polish.js');
+      const carbOnlyMeals = require('./app-carb-only-meals.js');
+      const carbOnlyMealsCompat = require('./app-carb-only-meals-compat.js');
+      const carbOnlyMealsFinal = require('./app-carb-only-meals-final.js');
+      const carbOnlyMealTiming = require('./app-carb-only-meals-timing.js');
+      const carbOnlyMealAssociation = require('./app-carb-only-meals-association.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -39,12 +44,19 @@
         ...feedbackGlooko,
         ...mealBolusAlignment,
         ...feedbackPolish,
+        ...carbOnlyMeals,
+        ...carbOnlyMealsCompat,
+        ...carbOnlyMealsFinal,
+        ...carbOnlyMealTiming,
+        ...carbOnlyMealAssociation,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
-        analyzeMeals: mealBoundary.analyzeMeals,
-        analyzeMealAdaptivePeak: mealBoundary.analyzeMealAdaptivePeak,
-        buildFoodComparisons: mealBoundary.buildFoodComparisons,
+        analyzeMeals: carbOnlyMealsFinal.analyzeMeals,
+        analyzeMealAdaptivePeak: carbOnlyMealTiming.analyzeMealAdaptivePeak,
+        analyzeMealTwoHourPeak: carbOnlyMealTiming.analyzeMealTwoHourPeak,
+        buildFoodComparisons: carbOnlyMeals.buildFoodComparisons,
+        augmentMealDiary: carbOnlyMealAssociation.augmentMealDiary,
       };
     }
     return;
@@ -97,7 +109,17 @@
                                                 loadScript('app-early-bolus-effect.js', () =>
                                                   loadScript('app-meal-bolus-alignment.js', () =>
                                                     loadScript('app-feedback-polish.js', () =>
-                                                      loadScript('app-version.js'),
+                                                      loadScript('app-carb-only-meals.js', () =>
+                                                        loadScript('app-carb-only-meals-compat.js', () =>
+                                                          loadScript('app-carb-only-meals-final.js', () =>
+                                                            loadScript('app-carb-only-meals-timing.js', () =>
+                                                              loadScript('app-carb-only-meals-association.js', () =>
+                                                                loadScript('app-version.js'),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),

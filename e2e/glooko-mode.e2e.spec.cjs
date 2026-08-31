@@ -140,7 +140,8 @@ test('native Glooko ZIP augments the still-editable local diary', async ({ page 
   await page.locator('#diary-form button[type="submit"]').click();
 
   await expect(page.locator('#meal-analysis')).toHaveClass(/\bactive\b/);
-  await expect(page.locator('#meal-summary strong')).toHaveText(['2', '1', '1', '1']);
+  await expect(page.locator('#meal-summary strong')).toHaveText(['1', '1', '1', '1']);
+  await expect(page.locator('#meal-events')).not.toContainText('Lokaler Testsnack');
 
   const storedAfterLocalEntry = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('glucosecoach-diary-v1') || '[]'),

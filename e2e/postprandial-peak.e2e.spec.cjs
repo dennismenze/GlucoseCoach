@@ -212,7 +212,7 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
 });
 
-test('blank-carbohydrate bolus cannot anchor a meal peak', async ({ page }) => {
+test('blank-carbohydrate bolus cannot anchor a meal peak while the carbohydrate meal is analyzed', async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const entry = {
     when: '2026-08-19T06:00',
@@ -240,12 +240,18 @@ test('blank-carbohydrate bolus cannot anchor a meal peak', async ({ page }) => {
   await expect(page.locator('#import-progress')).toContainText('Fertig:');
   await clickTab(page, 'meal-analysis');
 
+  await expect(page.locator('#meal-summary strong')).toHaveText(['1', '1', '0', '1']);
   const item = page.locator('#meal-events .analysis-item').first();
-  await expect(item.locator('.status')).toHaveText('teilweise');
-  await expect((await gridCell(item, 'Peak nach Mahlzeitenbolus')).locator('strong'))
-    .toHaveText('nicht bestimmbar');
+  await expect(item.locator('.status')).toHaveText('vollständig · ohne Mahlzeiteninsulin');
+  await expect((await gridCell(item, 'Peak nach Essen')).locator('strong'))
+    .toHaveText('223 mg/dl · 205 min nach Essen');
   await expect((await gridCell(item, 'maßgeblicher Mahlzeitenbolus')).locator('strong'))
-    .toHaveText('kein mahlzeitennaher positiver Bolus mit positiver KH-Angabe (±60 min) gefunden');
+    .toHaveText(
+      'kein Insulin zur Mahlzeit abgegeben · 40 g KH erfasst · ' +
+      '1 Korrekturbolus ohne KH-Angabe im Verlauf',
+    );
+  await expect((await gridCell(item, 'Stabil bestätigter Rückgang')).locator('strong'))
+    .toHaveText('205 min nach Essen');
 
   expect(errors.consoleErrors, 'browser console errors').toEqual([]);
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
