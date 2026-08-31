@@ -50,6 +50,10 @@
   }
 
   function augmentedEntry(entry, boluses) {
+    // The batch analyzer already passes fully augmented positive-carbohydrate entries.
+    // Rebuilding the entire Glooko meal set for every single entry made the browser
+    // workload grow roughly cubically with the number of carbohydrate rows.
+    if (finite(entry?.carbs) > 0) return entry;
     if (typeof carbApi?.augmentMealDiary !== 'function') return entry;
     const candidates = carbApi.augmentMealDiary([entry], boluses);
     const id = String(entry?.id ?? '');
@@ -300,7 +304,6 @@
       previousRender();
       rerenderMealPanel(currentUsableAnalyses());
     };
-    gcRender();
   }
 
   const api = {
