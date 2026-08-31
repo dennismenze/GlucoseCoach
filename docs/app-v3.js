@@ -21,6 +21,7 @@
       const feedbackPolish = require('./app-feedback-polish.js');
       const carbOnlyMeals = require('./app-carb-only-meals.js');
       const carbOnlyMealsCompat = require('./app-carb-only-meals-compat.js');
+      const carbOnlyMealsFinal = require('./app-carb-only-meals-final.js');
       module.exports = {
         ...require('./app-v3-core.js'),
         ...require('./app-importers.js'),
@@ -43,10 +44,11 @@
         ...feedbackPolish,
         ...carbOnlyMeals,
         ...carbOnlyMealsCompat,
+        ...carbOnlyMealsFinal,
         parseClinicalCsv: importers.parseClinicalCsv,
         mergeClinical: importers.mergeClinical,
         normalizeClinical: importers.normalizeClinical,
-        analyzeMeals: carbOnlyMeals.analyzeMeals,
+        analyzeMeals: carbOnlyMealsFinal.analyzeMeals,
         analyzeMealAdaptivePeak: carbOnlyMealsCompat.analyzeMealAdaptivePeak,
         analyzeMealTwoHourPeak: carbOnlyMealsCompat.analyzeMealTwoHourPeak,
         buildFoodComparisons: carbOnlyMeals.buildFoodComparisons,
@@ -104,7 +106,9 @@
                                                     loadScript('app-feedback-polish.js', () =>
                                                       loadScript('app-carb-only-meals.js', () =>
                                                         loadScript('app-carb-only-meals-compat.js', () =>
-                                                          loadScript('app-version.js'),
+                                                          loadScript('app-carb-only-meals-final.js', () =>
+                                                            loadScript('app-version.js'),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
