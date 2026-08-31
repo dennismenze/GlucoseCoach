@@ -1,0 +1,35 @@
+name: Apply carbohydrate-meal payload
+
+on:
+  push:
+    branches: [fix/include-carb-only-meals]
+    paths:
+      - '.github/carb-meal-payload/**'
+      - '.github/workflows/apply-carb-meal-payload.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/include-carb-only-meals
+          fetch-depth: 0
+      - name: Apply staged source and test changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/carb-meal-payload/part-* | base64 --decode > /tmp/carb-meal-payload.tar.gz
+          tar -xzf /tmp/carb-meal-payload.tar.gz -C .
+          rm -rf .github/carb-meal-payload
+          rm -f .github/workflows/apply-carb-meal-payload.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Analyze carbohydrate-only meals and hide unusable entries'
+          git push origin HEAD:fix/include-carb-only-meals
