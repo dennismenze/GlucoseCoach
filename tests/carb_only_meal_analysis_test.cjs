@@ -126,10 +126,14 @@ assert.equal(direct.peakComplete, false);
 
 const filteredGroups = app.buildFoodComparisons([
   carbOnly[0],
+  {
+    ...carbOnly[0],
+    entry: { ...carbOnly[0].entry, id: 'carb-only-copy', food: 'Apfel' },
+  },
   { ...direct, entry: { ...direct.entry, food: 'Apfel' } },
 ]);
 assert.equal(filteredGroups.length, 1);
-assert.equal(filteredGroups[0].entries, 1);
-assert.equal(filteredGroups[0].analyzed, 1);
+assert.equal(filteredGroups[0].entries, 2);
+assert.equal(filteredGroups[0].analyzed, 2);
 
 console.log('Carbohydrate-only meal and usable-list contracts passed');

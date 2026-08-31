@@ -212,7 +212,7 @@ test('correction boluses do not replace the meal bolus or postpone its peak turn
   expect(errors.pageErrors, 'uncaught browser errors').toEqual([]);
 });
 
-test('a blank-carbohydrate insulin delivery remains a correction while the carbohydrate meal is analyzed', async ({ page }) => {
+test('blank-carbohydrate bolus cannot anchor a meal peak while the carbohydrate meal is analyzed', async ({ page }) => {
   const errors = collectBrowserErrors(page);
   const entry = {
     when: '2026-08-19T06:00',
